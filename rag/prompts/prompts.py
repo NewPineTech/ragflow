@@ -166,8 +166,9 @@ def citation_prompt() -> str:
 
 
 def citation_plus(sources: str) -> str:
-    template = PROMPT_JINJA_ENV.from_string(CITATION_PLUS_TEMPLATE)
-    return template.render(example=citation_prompt(), sources=sources)
+    return ""
+#    template = PROMPT_JINJA_ENV.from_string(CITATION_PLUS_TEMPLATE)
+#    return template.render(example=citation_prompt(), sources=sources)
 
 
 def keyword_extraction(chat_mdl, content, topn=3):
