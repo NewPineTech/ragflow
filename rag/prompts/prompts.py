@@ -158,8 +158,11 @@ PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip
 
 
 def citation_prompt() -> str:
-    template = PROMPT_JINJA_ENV.from_string(CITATION_PROMPT_TEMPLATE)
-    return template.render()
+    return ""
+
+# def citation_prompt() -> str:
+#     template = PROMPT_JINJA_ENV.from_string(CITATION_PROMPT_TEMPLATE)
+#     return template.render()
 
 
 def citation_plus(sources: str) -> str:
