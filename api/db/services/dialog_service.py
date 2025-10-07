@@ -498,6 +498,7 @@ def chat(dialog, messages, stream=True, **kwargs):
                         idx.add(i)
 
             answer, idx = repair_bad_citation_formats(answer, kbinfos, idx)
+            answer = re.sub(r"\[ID:\d+\]", "", answer)
 
             idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
             recall_docs = [d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
