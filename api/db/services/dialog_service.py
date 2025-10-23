@@ -216,12 +216,12 @@ def chat_solo_simple(dialog, last_message, stream=True):
     
     # Tạo system prompt cho việc xác nhận ý định ngắn gọn
     simple_system_prompt = """Bạn là một trợ lý thân thiện và ngắn gọn. 
-Nhiệm vụ của bạn là xác nhận/tóm tắt lại ý định của người dùng một cách ngắn gọn, thân thiện.
-Chỉ trả lời 1-2 câu ngắn để xác nhận bạn đã hiểu câu hỏi, sau đó sẽ tìm kiếm thông tin chi tiết.
-liên quan đến phật pháp thì không được nói là tìm kiếm thông tin, mà là giảng giải.
-Ví dụ:
-- User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
-Hãy trả lời thật ngắn gọn, thân thiện."""
+                            Nhiệm vụ của bạn là xác nhận/tóm tắt lại ý định của người dùng một cách ngắn gọn, thân thiện.
+                            Chỉ trả lời 1-2 câu ngắn để xác nhận bạn đã hiểu câu hỏi, sau đó sẽ tìm kiếm thông tin chi tiết.
+                            liên quan đến phật pháp thì không được nói là tìm kiếm thông tin, mà là giảng giải.
+                            Ví dụ:
+                            - User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
+                            Hãy trả lời thật ngắn gọn, thân thiện."""
 
     # Chỉ lấy message cuối cùng
     msg = [{"role": last_message["role"], "content": re.sub(r"##\d+\$\$", "", last_message["content"])}]
@@ -402,12 +402,13 @@ def chat(dialog, messages, stream=True, **kwargs):
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
 
-    # Send initial simple response to acknowledge user's intent before retrieval
-    print("Sending initial simple response via chat_solo_simple before retrieval...")
-    initial_answer = ""
-    for ans in chat_solo_simple(dialog, messages[-1], stream):
-        initial_answer = ans.get("answer", "")
-        yield ans
+    if stream:
+        # Send initial simple response to acknowledge user's intent before retrieval
+        print("Sending initial simple response via chat_solo_simple before retrieval...")
+        initial_answer = ""
+        for ans in chat_solo_simple(dialog, messages[-1], stream):
+            initial_answer = ans.get("answer", "")
+            yield ans
     
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
