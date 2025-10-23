@@ -212,7 +212,7 @@ def full_question(tenant_id=None, llm_id=None, messages=[], language=None, chat_
         else:
             chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
     conv = []
-    for m in messages:
+    for m in messages[-3]:
         if m["role"] not in ["user", "assistant"]:
             continue
         conv.append("{}: {}".format(m["role"].upper(), m["content"]))
