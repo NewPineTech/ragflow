@@ -42,7 +42,7 @@ from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
 from rag.prompts import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in
-from rag.prompts.prompts import gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt
+from rag.prompts.prompts import begin_chat, gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt
 from rag.utils import num_tokens_from_string, rmSpace
 from rag.utils.tavily_conn import Tavily
 
@@ -343,9 +343,9 @@ def chat(dialog, messages, stream=True, **kwargs):
     if toolcall_session and tools:
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
-    
-    begin_chat =  [begin_chat(dialog.tenant_id, dialog.llm_id, messages)]
-    yield {"answer": + begin_chat, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+
+    ans =  [begin_chat(dialog.tenant_id, dialog.llm_id, messages)]
+    yield {"answer": + ans, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
 
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
