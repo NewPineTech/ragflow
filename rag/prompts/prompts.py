@@ -155,6 +155,7 @@ META_FILTER = load_prompt("meta_filter")
 ASK_SUMMARY = load_prompt("ask_summary")
 
 QUESTION_CLASSIFY_TEMPLATE = load_prompt("question_classify")
+BEGIN_ANSWER_TEMPLATE = load_prompt("begin_answer")
 
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
@@ -456,3 +457,41 @@ def question_classify_prompt(tenant_id=None, llm_id=None, content="", language=N
     rendered_prompt = template.render(content=content)
     ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
     return ans if ans.find("**ERROR**") < 0 else content
+
+
+
+def begin_chat(tenant_id=None, llm_id=None,  messages=[], language=None, chat_mdl=None):
+    if not messages:
+        return ""
+    from api.db import LLMType
+    from api.db.services.llm_service import LLMBundle
+    from api.db.services.tenant_llm_service import TenantLLMService
+
+    if not chat_mdl:
+        if TenantLLMService.llm_id2llm_type(llm_id) == "image2text":
+            chat_mdl = LLMBundle(tenant_id, LLMType.IMAGE2TEXT, llm_id)
+        else:
+            chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
+    conv = []
+    for m in messages:
+        if m["role"] not in ["user", "assistant"]:
+            continue
+        conv.append("{}: {}".format(m["role"].upper(), m["content"]))
+    conversation = "\n".join(conv)
+    today = datetime.date.today().isoformat()
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    tomorrow = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+
+    template = PROMPT_JINJA_ENV.from_string(BEGIN_ANSWER_TEMPLATE)
+    rendered_prompt = template.render(
+        today=today,
+        yesterday=yesterday,
+        tomorrow=tomorrow,
+        conversation=conversation,
+        language=language,
+    )
+
+    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
+    return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
+
