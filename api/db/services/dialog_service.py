@@ -193,6 +193,56 @@ def chat_solo(dialog, messages, stream=True):
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
+def chat_solo_simple(dialog, messages, stream=True):
+    """
+    Trả lời ngắn gọn để xác nhận/tóm tắt ý định của user trước khi retrieve.
+    Ví dụ: User hỏi "bát quan trai là gì" -> Trả lời: "Con muốn tìm hiểu về bát quan trai à."
+    """
+    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+    else:
+        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+
+    tts_mdl = None
+    prompt_config = dialog.prompt_config
+    if prompt_config.get("tts"):
+        tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
+    
+    # Tạo system prompt cho việc xác nhận ý định ngắn gọn
+    simple_system_prompt = """Bạn là một trợ lý thân thiện và ngắn gọn. 
+Nhiệm vụ của bạn là xác nhận/tóm tắt lại ý định của người dùng một cách ngắn gọn, thân thiện.
+Chỉ trả lời 1-2 câu ngắn để xác nhận bạn đã hiểu câu hỏi, sau đó sẽ tìm kiếm thông tin chi tiết.
+Ví dụ:
+- User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
+Hãy trả lời thật ngắn gọn, thân thiện và xác nhận bạn sẽ tìm kiếm thông tin."""
+
+    msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
+    
+    # Cấu hình để trả lời ngắn gọn
+    simple_gen_conf = dialog.llm_setting.copy()
+    simple_gen_conf["max_tokens"] = 100  # Giới hạn để trả lời ngắn
+    simple_gen_conf["temperature"] = 0.7  # Tăng độ sáng tạo một chút
+    
+    if stream:
+        last_ans = ""
+        delta_ans = ""
+        for ans in chat_mdl.chat_streamly(simple_system_prompt, msg, simple_gen_conf):
+            answer = ans
+            delta_ans = ans[len(last_ans):]
+            if num_tokens_from_string(delta_ans) < 8:  # Ngưỡng thấp hơn để stream nhanh hơn
+                continue
+            last_ans = answer
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+            delta_ans = ""
+        if delta_ans:
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+    else:
+        answer = chat_mdl.chat(simple_system_prompt, msg, simple_gen_conf)
+        user_content = msg[-1].get("content", "[content not available]")
+        logging.debug("User: {}|Assistant (simple): {}".format(user_content, answer))
+        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+
+
 def get_models(dialog):
     embd_mdl, chat_mdl, rerank_mdl, tts_mdl = None, None, None, None
     kbs = KnowledgebaseService.get_by_ids(dialog.kb_ids)
@@ -344,10 +394,10 @@ def chat(dialog, messages, stream=True, **kwargs):
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
 
-    # Send initial response using chat_solo before retrieval
-    print("Sending initial response via chat_solo before retrieval...")
+    # Send initial simple response to acknowledge user's intent before retrieval
+    print("Sending initial simple response via chat_solo_simple before retrieval...")
     initial_answer = ""
-    for ans in chat_solo(dialog, messages, stream):
+    for ans in chat_solo_simple(dialog, messages, stream):
         initial_answer = ans.get("answer", "")
         yield ans
     
@@ -527,7 +577,7 @@ def chat(dialog, messages, stream=True, **kwargs):
         
         # Append retrieval answer to initial answer
         if initial_answer:
-            answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + answer
+            answer = initial_answer + answer
         
         finish_chat_ts = timer()
 
@@ -583,11 +633,11 @@ def chat(dialog, messages, stream=True, **kwargs):
                 continue
             last_ans = answer
             # Append to initial answer for streaming
-            combined_answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + thought + answer if initial_answer else thought + answer
+            combined_answer = initial_answer +  thought + answer if initial_answer else thought + answer
             yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
         delta_ans = answer[len(last_ans) :]
         if delta_ans:
-            combined_answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + thought + answer if initial_answer else thought + answer
+            combined_answer = initial_answer +  thought + answer if initial_answer else thought + answer
             yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
         yield decorate_answer(thought + answer)
     else:
