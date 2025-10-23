@@ -308,9 +308,10 @@ def chat(dialog, messages, stream=True, **kwargs):
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
 
     current_message=messages[-1]["content"]
-    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)]
-    print("Classify:", classify)
+    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
+    print("Classify:", classify) #Classify: ['GREET']
     if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
+        print("Use solo chat for greeting or sensitive question or no knowledge base.")
         for ans in chat_solo(dialog, messages, stream):
             yield ans
         return
