@@ -193,10 +193,16 @@ def chat_solo(dialog, messages, stream=True):
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
-def chat_solo_simple(dialog, messages, stream=True):
+def chat_solo_simple(dialog, last_message, stream=True):
     """
     Trả lời ngắn gọn để xác nhận/tóm tắt ý định của user trước khi retrieve.
+    Chỉ nhận message cuối cùng từ user.
     Ví dụ: User hỏi "bát quan trai là gì" -> Trả lời: "Con muốn tìm hiểu về bát quan trai à."
+    
+    Args:
+        dialog: Dialog object
+        last_message: Dict containing the last user message, e.g. {"role": "user", "content": "..."}
+        stream: Boolean for streaming response
     """
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
@@ -216,7 +222,8 @@ Ví dụ:
 - User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
 Hãy trả lời thật ngắn gọn, thân thiện và xác nhận bạn sẽ tìm kiếm thông tin."""
 
-    msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
+    # Chỉ lấy message cuối cùng
+    msg = [{"role": last_message["role"], "content": re.sub(r"##\d+\$\$", "", last_message["content"])}]
     
     # Cấu hình để trả lời ngắn gọn
     simple_gen_conf = dialog.llm_setting.copy()
