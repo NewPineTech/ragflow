@@ -344,9 +344,13 @@ def chat(dialog, messages, stream=True, **kwargs):
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
 
-    ans =  [begin_chat(dialog.tenant_id, dialog.llm_id, messages)]
-    yield {"answer": + ans, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
-
+    # Send initial response using chat_solo before retrieval
+    print("Sending initial response via chat_solo before retrieval...")
+    initial_answer = ""
+    for ans in chat_solo(dialog, messages, stream):
+        initial_answer = ans.get("answer", "")
+        yield ans
+    
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
@@ -479,7 +483,7 @@ def chat(dialog, messages, stream=True, **kwargs):
         gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
 
     def decorate_answer(answer):
-        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer
+        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, initial_answer
 
         refs = []
         ans = answer.split("</think>")
@@ -520,6 +524,11 @@ def chat(dialog, messages, stream=True, **kwargs):
 
         if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
             answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
+        
+        # Append retrieval answer to initial answer
+        if initial_answer:
+            answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + answer
+        
         finish_chat_ts = timer()
 
         total_time_cost = (finish_chat_ts - chat_start_ts) * 1000
@@ -573,10 +582,13 @@ def chat(dialog, messages, stream=True, **kwargs):
             if num_tokens_from_string(delta_ans) < 16:
                 continue
             last_ans = answer
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+            # Append to initial answer for streaming
+            combined_answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + thought + answer if initial_answer else thought + answer
+            yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
         delta_ans = answer[len(last_ans) :]
         if delta_ans:
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+            combined_answer = initial_answer + "\n\n--- Retrieved Information ---\n\n" + thought + answer if initial_answer else thought + answer
+            yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
         yield decorate_answer(thought + answer)
     else:
         answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
