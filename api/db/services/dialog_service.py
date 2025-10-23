@@ -218,9 +218,10 @@ def chat_solo_simple(dialog, last_message, stream=True):
     simple_system_prompt = """Bạn là một trợ lý thân thiện và ngắn gọn. 
 Nhiệm vụ của bạn là xác nhận/tóm tắt lại ý định của người dùng một cách ngắn gọn, thân thiện.
 Chỉ trả lời 1-2 câu ngắn để xác nhận bạn đã hiểu câu hỏi, sau đó sẽ tìm kiếm thông tin chi tiết.
+liên quan đến phật pháp thì không được nói là tìm kiếm thông tin, mà là giảng giải.
 Ví dụ:
 - User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
-Hãy trả lời thật ngắn gọn, thân thiện và xác nhận bạn sẽ tìm kiếm thông tin."""
+Hãy trả lời thật ngắn gọn, thân thiện."""
 
     # Chỉ lấy message cuối cùng
     msg = [{"role": last_message["role"], "content": re.sub(r"##\d+\$\$", "", last_message["content"])}]
