@@ -326,9 +326,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     max_tokens = llm_model_config.get("max_tokens", 8192)
 
     check_llm_ts = timer()
-    for ans in chat_solo(dialog, messages, stream):
-            yield ans
-
+   
     langfuse_tracer = None
     trace_context = {}
     langfuse_keys = TenantLangfuseService.filter_by_tenant(tenant_id=dialog.tenant_id)
@@ -345,6 +343,9 @@ def chat(dialog, messages, stream=True, **kwargs):
     if toolcall_session and tools:
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
+    
+    begin_chat =  [begin_chat(dialog.tenant_id, dialog.llm_id, messages)]
+    yield {"answer": + begin_chat, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
 
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
