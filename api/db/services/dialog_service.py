@@ -326,6 +326,8 @@ def chat(dialog, messages, stream=True, **kwargs):
     max_tokens = llm_model_config.get("max_tokens", 8192)
 
     check_llm_ts = timer()
+    for ans in chat_solo(dialog, [current_message], stream):
+            yield ans
 
     langfuse_tracer = None
     trace_context = {}
