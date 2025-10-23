@@ -306,6 +306,10 @@ def meta_filter(metas: dict, filters: list[dict]):
 
 def chat(dialog, messages, stream=True, **kwargs):
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
+
+    current_message=messages[-1]["content"]
+    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)]
+    print("Classify:", classify)
     if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
         for ans in chat_solo(dialog, messages, stream):
             yield ans
@@ -498,7 +502,6 @@ def chat(dialog, messages, stream=True, **kwargs):
                         idx.add(i)
 
             answer, idx = repair_bad_citation_formats(answer, kbinfos, idx)
-            answer = re.sub(r"\[ID:\d+\]", "", answer)
 
             idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
             recall_docs = [d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
@@ -546,6 +549,7 @@ def chat(dialog, messages, stream=True, **kwargs):
             langfuse_output = {"time_elapsed:": re.sub(r"\n", "  \n", langfuse_output), "created_at": time.time()}
             langfuse_generation.update(output=langfuse_output)
             langfuse_generation.end()
+            
 
         return {"answer": think + answer, "reference": refs, "prompt": re.sub(r"\n", "  \n", prompt), "created_at": time.time()}
 

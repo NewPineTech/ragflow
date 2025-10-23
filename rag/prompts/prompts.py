@@ -154,21 +154,20 @@ RANK_MEMORY = load_prompt("rank_memory")
 META_FILTER = load_prompt("meta_filter")
 ASK_SUMMARY = load_prompt("ask_summary")
 
+QUESTION_CLASSIFY_TEMPLATE = load_prompt("question_classify")
+
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
 
 def citation_prompt() -> str:
-    return ""
-
-# def citation_prompt() -> str:
-#     template = PROMPT_JINJA_ENV.from_string(CITATION_PROMPT_TEMPLATE)
-#     return template.render()
+     template = PROMPT_JINJA_ENV.from_string(CITATION_PROMPT_TEMPLATE)
+     return template.render()
 
 
 def citation_plus(sources: str) -> str:
-    return ""
-#    template = PROMPT_JINJA_ENV.from_string(CITATION_PLUS_TEMPLATE)
-#    return template.render(example=citation_prompt(), sources=sources)
+    template = PROMPT_JINJA_ENV.from_string(CITATION_PLUS_TEMPLATE)
+    return template.render(example=citation_prompt(), sources=sources)
+
 
 
 def keyword_extraction(chat_mdl, content, topn=3):
@@ -438,3 +437,22 @@ def gen_meta_filter(chat_mdl, meta_data:dict, query: str) -> list:
     except Exception:
         logging.exception(f"Loading json failure: {ans}")
     return []
+
+
+def question_classify_prompt(tenant_id=None, llm_id=None, content="", language=None, chat_mdl=None):
+    if not content:
+        return ""
+    from api.db import LLMType
+    from api.db.services.llm_service import LLMBundle
+    from api.db.services.tenant_llm_service import TenantLLMService
+
+    if not chat_mdl:
+        if TenantLLMService.llm_id2llm_type(llm_id) == "image2text":
+            chat_mdl = LLMBundle(tenant_id, LLMType.IMAGE2TEXT, llm_id)
+        else:
+            chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
+   
+    template = PROMPT_JINJA_ENV.from_string(QUESTION_CLASSIFY_TEMPLATE)
+    rendered_prompt = template.render(content=content)
+    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    return ans if ans.find("**ERROR**") < 0 else content
