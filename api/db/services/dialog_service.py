@@ -42,7 +42,7 @@ from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
 from rag.prompts import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in
-from rag.prompts.prompts import gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY
+from rag.prompts.prompts import gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt
 from rag.utils import num_tokens_from_string, rmSpace
 from rag.utils.tavily_conn import Tavily
 
@@ -310,7 +310,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     current_message=messages[-1]["content"]
     classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)]
     print("Classify:", classify)
-    if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
+    if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
         for ans in chat_solo(dialog, messages, stream):
             yield ans
         return
