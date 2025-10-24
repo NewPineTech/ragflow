@@ -26,6 +26,12 @@ import trio
 from langfuse import Langfuse
 from peewee import fn
 
+try:
+    from lunarcalendar import Converter, Solar
+except ImportError:
+    Converter = None
+    Solar = None
+
 from agentic_reasoning import DeepResearcher
 from api import settings
 from api.db import LLMType, ParserType, StatusEnum
@@ -162,6 +168,42 @@ class DialogService(CommonService):
         return list(dialogs.dicts()), count
 
 
+def get_current_datetime_info():
+    """
+    Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
+    Returns: String chứa thông tin ngày giờ
+    """
+    now = datetime.now()
+    
+    # Ngày dương lịch
+    solar_date = now.strftime("%d/%m/%Y")
+    current_time = now.strftime("%H:%M:%S")
+    weekday = now.strftime("%A")
+    weekday_vi = {
+        "Monday": "Thứ Hai",
+        "Tuesday": "Thứ Ba", 
+        "Wednesday": "Thứ Tư",
+        "Thursday": "Thứ Năm",
+        "Friday": "Thứ Sáu",
+        "Saturday": "Thứ Bảy",
+        "Sunday": "Chủ Nhật"
+    }
+    
+    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_date}, lúc {current_time}"
+    
+    # Thêm ngày âm lịch nếu có thư viện
+    if Converter and Solar:
+        try:
+            solar = Solar(now.year, now.month, now.day)
+            lunar = Converter.Solar2Lunar(solar)
+            lunar_date = f"{lunar.day}/{lunar.month}/{lunar.year}"
+            datetime_info += f" (Âm lịch: {lunar_date})"
+        except Exception as e:
+            logging.debug(f"Could not convert to lunar calendar: {e}")
+    
+    return datetime_info
+
+
 def chat_solo(dialog, messages, stream=True):
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
@@ -169,6 +211,14 @@ def chat_solo(dialog, messages, stream=True):
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
 
     prompt_config = dialog.prompt_config
+    
+    # Thêm thông tin ngày giờ hiện tại
+    datetime_info = get_current_datetime_info()
+    
+    # Lấy system prompt và thêm thông tin ngày giờ
+    system_prompt = prompt_config.get("system", "")
+    system_content = f"{datetime_info}\n\n{system_prompt}"
+    
     tts_mdl = None
     if prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
@@ -176,7 +226,7 @@ def chat_solo(dialog, messages, stream=True):
     if stream:
         last_ans = ""
         delta_ans = ""
-        for ans in chat_mdl.chat_streamly(prompt_config.get("system", ""), msg, dialog.llm_setting):
+        for ans in chat_mdl.chat_streamly(system_content, msg, dialog.llm_setting):
             answer = ans
             delta_ans = ans[len(last_ans) :]
             if num_tokens_from_string(delta_ans) < 16:
@@ -530,9 +580,22 @@ def chat(dialog, messages, stream=True, **kwargs):
         return {"answer": prompt_config["empty_response"], "reference": kbinfos}
 
     kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
+    
+    # Thêm thông tin ngày giờ hiện tại
+    datetime_info = get_current_datetime_info()
     gen_conf = dialog.llm_setting
 
-    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)}]
+    # Format system prompt với thông tin ngày giờ
+    try:
+        system_content = prompt_config["system"].format(**kwargs)
+    except KeyError as e:
+        # Nếu còn placeholder chưa được thay thế, dùng giá trị rỗng
+        logging.warning(f"Missing parameter in system prompt: {e}")
+        system_content = prompt_config["system"]
+    
+    system_content = f"{datetime_info}\n\n{system_content}"
+    
+    msg = [{"role": "system", "content": system_content}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()

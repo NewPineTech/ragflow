@@ -150,6 +150,7 @@ class Base(ABC):
         ans = response.choices[0].message.content.strip()
         if response.choices[0].finish_reason == "length":
             ans = self._length_stop(ans)
+        logging.info(f"[LLM RESPONSE] {ans}")
         return ans, self.total_token_count(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
@@ -1426,6 +1427,8 @@ class LiteLLMBase(ABC):
         ans = response.choices[0].message.content.strip()
         if response.choices[0].finish_reason == "length":
             ans = self._length_stop(ans)
+            
+        logging.info(f"[LLM RESPONSE] {ans}")
 
         return ans, self.total_token_count(response)
 
