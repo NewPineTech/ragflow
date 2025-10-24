@@ -188,9 +188,10 @@ def get_current_datetime_info():
         "Saturday": "Thứ Bảy",
         "Sunday": "Chủ Nhật"
     }
-    
-    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_date}, lúc {current_time}"
-    
+
+    solar_day = now.strftime("%d")
+    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_day}, tháng {now.month}, năm {now.year}, lúc {current_time}."
+
     # Thêm ngày âm lịch nếu có thư viện
     if Converter and Solar:
         try:
