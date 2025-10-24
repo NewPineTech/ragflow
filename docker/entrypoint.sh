@@ -181,7 +181,7 @@ if [[ "${ENABLE_WEBSERVER}" -eq 1 ]]; then
 
     echo "Starting ragflow_server with Uvicorn..."
     while true; do
-        uvicorn api.ragflow_server:asgi_app \
+        uvicorn api.asgi:asgi_app \
             --host 0.0.0.0 \
             --port 9380 \
             --workers 1 \

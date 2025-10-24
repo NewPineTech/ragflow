@@ -75,18 +75,6 @@ def signal_handler(sig, frame):
     time.sleep(1)
     sys.exit(0)
 
-# Create ASGI app wrapper for Uvicorn
-try:
-    from asgiref.wsgi import WsgiToAsgi
-    asgi_app = WsgiToAsgi(app)
-except ImportError:
-    try:
-        from a2wsgi import WSGIMiddleware
-        asgi_app = WSGIMiddleware(app)
-    except ImportError:
-        logging.warning("Neither asgiref nor a2wsgi found. ASGI wrapper not available.")
-        asgi_app = app
-
 if __name__ == '__main__':
     logging.info(r"""
         ____   ___    ______ ______ __
