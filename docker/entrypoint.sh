@@ -29,7 +29,7 @@ ENABLE_TASKEXECUTOR=1  # Default to enable task executor
 ENABLE_MCP_SERVER=0
 CONSUMER_NO_BEG=0
 CONSUMER_NO_END=0
-WORKERS=1
+WORKERS=4
 
 MCP_HOST="127.0.0.1"
 MCP_PORT=9382
@@ -179,9 +179,14 @@ if [[ "${ENABLE_WEBSERVER}" -eq 1 ]]; then
     echo "Starting nginx..."
     /usr/sbin/nginx
 
-    echo "Starting ragflow_server..."
+    echo "Starting ragflow_server with Uvicorn..."
     while true; do
-        "$PY" api/ragflow_server.py
+        uvicorn api.ragflow_server:asgi_app \
+            --host 0.0.0.0 \
+            --port 9380 \
+            --workers 1 \
+            --timeout-keep-alive 30 \
+            --log-level info
     done &
 fi
 
