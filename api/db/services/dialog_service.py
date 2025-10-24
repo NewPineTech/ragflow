@@ -238,7 +238,7 @@ def chat_solo(dialog, messages, stream=True):
         if delta_ans:
             yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
     else:
-        answer = chat_mdl.chat(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
@@ -272,6 +272,8 @@ def chat_solo_simple(dialog, last_message, stream=True):
                             liên quan đến phật pháp thì không được nói là tìm kiếm thông tin, mà là giảng giải.
                             Ví dụ:
                             - User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
+                            - User: "con muốn tìm hiểu về tu tập" -> Bot: "Thầy rất vui khi con quan tâm đến việc tu tập."
+                            - User: "Thầy giảng cho con về phật pháp đi" -> Bot: "Thật là tốt khi con muốn tìm hiểu về phật pháp."
                             Hãy trả lời thật ngắn gọn, thân thiện."""
 
     # Chỉ lấy message cuối cùng
