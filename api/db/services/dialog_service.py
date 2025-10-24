@@ -403,13 +403,16 @@ def chat(dialog, messages, stream=True, **kwargs):
     bind_models_ts = timer()
 
     # Send initial simple response to acknowledge user's intent before retrieval
-    print("Sending initial simple response via chat_solo_simple before retrieval...")
+    print("=== START: Sending initial simple response via chat_solo_simple before retrieval ===")
     initial_answer = ""
     if stream:
         for ans in chat_solo_simple(dialog, messages[-1], stream):
             initial_answer = ans.get("answer", "")
+            print(f"=== YIELDING simple answer: {initial_answer[:50]}... ===")
             yield ans
-    
+        print(f"=== DONE: Simple answer sent. Starting retrieval... ===")
+    if initial_answer:
+        initial_answer += "\n"
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
@@ -576,10 +579,10 @@ def chat(dialog, messages, stream=True, **kwargs):
                 recall_docs = kbinfos["doc_aggs"]
             kbinfos["doc_aggs"] = recall_docs
 
-            refs = deepcopy(kbinfos)
-            for c in refs["chunks"]:
-                if c.get("vector"):
-                    del c["vector"]
+        refs = deepcopy(kbinfos)
+        for c in refs["chunks"]:
+            if c.get("vector"):
+                del c["vector"]
 
         if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
             answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
