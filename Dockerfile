@@ -210,4 +210,7 @@ RUN chmod +x ./entrypoint*.sh
 COPY --from=builder /ragflow/web/dist /ragflow/web/dist
 
 COPY --from=builder /ragflow/VERSION /ragflow/VERSION
+
+RUN . ${VIRTUAL_ENV}/bin/activate && pip install gunicorn
+
 ENTRYPOINT ["./entrypoint.sh"]
