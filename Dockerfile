@@ -156,9 +156,9 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
         sed -i 's|mirrors.aliyun.com/pypi|pypi.org|g' uv.lock; \
     fi; \
     if [ "$LIGHTEN" == "1" ]; then \
-        uv sync --python 3.10 --frozen; \
+        uv sync --python 3.10; \
     else \
-        uv sync --python 3.10 --frozen --all-extras; \
+        uv sync --python 3.10 --all-extras; \
     fi
 
 COPY web web
