@@ -402,10 +402,10 @@ def chat(dialog, messages, stream=True, **kwargs):
         chat_mdl.bind_tools(toolcall_session, tools)
     bind_models_ts = timer()
 
+    # Send initial simple response to acknowledge user's intent before retrieval
+    print("Sending initial simple response via chat_solo_simple before retrieval...")
+    initial_answer = ""
     if stream:
-        # Send initial simple response to acknowledge user's intent before retrieval
-        print("Sending initial simple response via chat_solo_simple before retrieval...")
-        initial_answer = ""
         for ans in chat_solo_simple(dialog, messages[-1], stream):
             initial_answer = ans.get("answer", "")
             yield ans
