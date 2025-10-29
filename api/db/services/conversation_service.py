@@ -14,6 +14,7 @@
 #  limitations under the License.
 #
 import time
+import logging
 from uuid import uuid4
 from api.db import StatusEnum
 from api.db.db_models import Conversation, DB
@@ -21,6 +22,7 @@ from api.db.services.api_service import API4ConversationService
 from api.db.services.common_service import CommonService
 from api.db.services.dialog_service import DialogService, chat
 from api.utils import get_uuid
+from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 import json
 
 from rag.prompts import chunks_format
@@ -124,6 +126,18 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     message_id = msg[-1].get("id")
     e, dia = DialogService.get_by_id(conv.dialog_id)
 
+    # Load memory from Redis
+    logging.info(f"[MEMORY] Loading memory for session: {session_id}")
+    print(f"[MEMORY] Loading memory for session: {session_id}")
+    memory = get_memory_from_redis(session_id)
+    if memory:
+        kwargs["short_memory"] = memory
+        logging.info(f"[MEMORY] Using memory for session: {session_id}")
+        print(f"[MEMORY] Memory loaded: {memory[:100]}...")
+    else:
+        logging.info(f"[MEMORY] No memory found for session: {session_id}")
+        print(f"[MEMORY] No existing memory")
+
     kb_ids = kwargs.get("kb_ids",[])
     dia.kb_ids = list(set(dia.kb_ids + kb_ids))
     if not conv.reference:
@@ -137,6 +151,12 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
                 ans = structure_answer(conv, ans, message_id, session_id)
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
             ConversationService.update_by_id(conv.id, conv.to_dict())
+            
+            # Generate memory after stream completes
+            print(f"[STREAM] Generating memory for session: {session_id}")
+            generate_and_save_memory_async(session_id, dia, conv.message)
+            print(f"[STREAM] Memory generation triggered")
+            
         except Exception as e:
             yield "data:" + json.dumps({"code": 500, "message": str(e),
                                         "data": {"answer": "**ERROR**: " + str(e), "reference": []}},
@@ -149,6 +169,12 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             answer = structure_answer(conv, ans, message_id, session_id)
             ConversationService.update_by_id(conv.id, conv.to_dict())
             break
+        
+        # Generate memory after non-stream completes
+        print(f"[NON-STREAM] Generating memory for session: {session_id}")
+        generate_and_save_memory_async(session_id, dia, conv.message)
+        print(f"[NON-STREAM] Memory generation triggered")
+        
         yield answer
 
 
