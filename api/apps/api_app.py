@@ -389,6 +389,12 @@ def completion():
             return get_json_result(data=result)
 
         # ******************For dialog******************
+        print(f"\n{'='*60}")
+        print(f"[DIALOG PATH] Entered dialog path")
+        print(f"[DIALOG PATH] conversation_id: {req.get('conversation_id')}")
+        print(f"[DIALOG PATH] stream: {req.get('stream', True)}")
+        print(f"{'='*60}\n")
+        
         conv.message.append(msg[-1])
         e, dia = DialogService.get_by_id(conv.dialog_id)
         if not e:
@@ -423,13 +429,13 @@ def completion():
                                                ensure_ascii=False) + "\n\n"
                 API4ConversationService.append_message(conv.id, conv.to_dict())
                 
-                # Generate and save memory asynchronously after response sent
-                print(f"\n[STREAM DEBUG] About to call generate_and_save_memory_async")
+                # NOW generate memory after chat completed
+                print(f"\n[STREAM DEBUG] Chat completed, calling generate_and_save_memory_async")
                 print(f"[STREAM DEBUG] conversation_id: {conversation_id}")
-                print(f"[STREAM DEBUG] dia type: {type(dia)}")
                 print(f"[STREAM DEBUG] conv.message length: {len(conv.message)}")
                 generate_and_save_memory_async(conversation_id, dia, conv.message)
-                print(f"[STREAM DEBUG] Returned from generate_and_save_memory_async\n")
+                print(f"[STREAM DEBUG] Memory generation triggered\n")
+                
             except Exception as e:
                 yield "data:" + json.dumps({"code": 500, "message": str(e),
                                             "data": {"answer": "**ERROR**: " + str(e), "reference": []}},
