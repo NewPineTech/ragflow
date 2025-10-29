@@ -53,13 +53,14 @@ def cache_retrieval(ttl: int = 60):
             result = func(*args, **kwargs)
             try:
                 if isinstance(result, dict):
-                    cache_data = json.dumps(result, ensure_ascii=False)
+                    cache_data = json.dumps(result, ensure_ascii=False, default=str)
                     if REDIS_CONN:
                         REDIS_CONN.setex(cache_key, ttl, cache_data)
                     else:
                         _cache_memory[cache_key] = (result, time.time())
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[CACHE] Serialization failed: {e}")
+
             return result
         return wrapper
     _cache_memory = {}
