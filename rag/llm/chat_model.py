@@ -140,7 +140,7 @@ class Base(ABC):
         return gen_conf
 
     def _chat(self, history, gen_conf, **kwargs):
-        logging.info("[HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
+        #logging.info("[HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
         if self.model_name.lower().find("qwen3") >= 0:
             kwargs["extra_body"] = {"enable_thinking": False}
         response = self.client.chat.completions.create(model=self.model_name, messages=history, **gen_conf, **kwargs)
@@ -1410,7 +1410,7 @@ class LiteLLMBase(ABC):
         return gen_conf
 
     def _chat(self, history, gen_conf, **kwargs):
-        logging.info("[HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
+        #logging.info("[HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
         if self.model_name.lower().find("qwen3") >= 0:
             kwargs["extra_body"] = {"enable_thinking": False}
 
