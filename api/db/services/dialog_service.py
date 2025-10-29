@@ -51,6 +51,7 @@ from rag.prompts import chunks_format, citation_prompt, cross_languages, full_qu
 from rag.prompts.prompts import begin_chat, gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, short_memory
 from rag.utils import num_tokens_from_string, rmSpace
 from rag.utils.tavily_conn import Tavily
+from rag.utils.redis_conn import REDIS_CONN
 
 
 class DialogService(CommonService):
@@ -491,11 +492,9 @@ def chat(dialog, messages, stream=True, **kwargs):
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
 
     if len(questions) > 1 and prompt_config.get("refine_multiturn"):
-        #memory    =  short_memory(dialog.tenant_id, dialog.llm_id, messages)
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
-        #memory = ""
 
     if prompt_config.get("cross_languages"):
         questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
@@ -588,6 +587,10 @@ def chat(dialog, messages, stream=True, **kwargs):
     
     # Thêm thông tin ngày giờ hiện tại
     datetime_info = get_current_datetime_info()
+    
+    # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
+    memory_text = kwargs.pop("short_memory", None)
+    
     gen_conf = dialog.llm_setting
 
     # Format system prompt với thông tin ngày giờ
@@ -598,7 +601,11 @@ def chat(dialog, messages, stream=True, **kwargs):
         logging.warning(f"Missing parameter in system prompt: {e}")
         system_content = prompt_config["system"]
     
+    # Thêm datetime info và memory vào system prompt
     system_content = f"{datetime_info}\n\n{system_content}"
+    if memory_text:
+        system_content = f"{system_content}\n\n## Historical Memory:\n{memory_text}"
+        logging.info("Memory added to system prompt")
     
     msg = [{"role": "system", "content": system_content}]
     prompt4citation = ""
