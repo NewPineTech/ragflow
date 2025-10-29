@@ -85,7 +85,7 @@ def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 
         return False
 
 
-def generate_and_save_memory_async(conversation_id: str, dialog, messages: list, old_memory: str = "") -> None:
+def generate_and_save_memory_async(conversation_id: str, dialog, messages: list, old_memory=None) -> None:
     """
     Generate memory summary using LLM and save to Redis asynchronously.
     This runs in a background thread to avoid blocking the response.
@@ -108,7 +108,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             print(f"[MEMORY THREAD] About to call short_memory()...")
             
             # Call LLM to generate memory summary
-            memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages, old_memory=old_memory )
+            memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages, short_memory=old_memory)
             
             print(f"[MEMORY THREAD] short_memory() returned: {memory_text[:100] if memory_text else 'None'}...")
             
