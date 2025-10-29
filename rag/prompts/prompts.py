@@ -519,7 +519,7 @@ def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, la
     template = PROMPT_JINJA_ENV.from_string(MEMORY_PROMPT)
     rendered_prompt = template.render(
         content=conversation,
-        language=language,
+        old_memory=short_memory,
     )
 
     ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])

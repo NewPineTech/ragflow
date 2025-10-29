@@ -154,7 +154,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             
             # Generate memory after stream completes
             print(f"[STREAM] Generating memory for session: {session_id}")
-            generate_and_save_memory_async(session_id, dia, conv.message)
+            generate_and_save_memory_async(session_id, dia, conv.message, old_memory=memory)
             print(f"[STREAM] Memory generation triggered")
             
         except Exception as e:
@@ -172,7 +172,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
         
         # Generate memory after non-stream completes
         print(f"[NON-STREAM] Generating memory for session: {session_id}")
-        generate_and_save_memory_async(session_id, dia, conv.message)
+        generate_and_save_memory_async(session_id, dia, conv.message,old_memory=memory)
         print(f"[NON-STREAM] Memory generation triggered")
         
         yield answer
