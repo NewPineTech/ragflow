@@ -518,7 +518,7 @@ def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, la
         conversation += short_memory
     template = PROMPT_JINJA_ENV.from_string(MEMORY_PROMPT)
     rendered_prompt = template.render(
-        conversation=conversation,
+        content=conversation,
         language=language,
     )
 

@@ -11,6 +11,10 @@ summarizing conversation content, following these rules:
 2. Don't summarize for the sake of summarizing, if user's chat is meaningless, returning the original historical record is acceptable
 4. Only return summary digest, strictly control within 1800 words
 5. Don't include code or XML, no explanations, annotations or descriptions needed, when saving memory only extract information from conversations, don't mix in example content
-
+{% if language %}
+6.Text generated MUST be in {{ language }}.
+{% else %}
+6. Text generated MUST be in the same language as the original user's content.
+{% endif %}
 ## Conversation Content
 {{ content }}
