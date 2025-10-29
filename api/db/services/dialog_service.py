@@ -48,7 +48,7 @@ from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
 from rag.prompts import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in
-from rag.prompts.prompts import begin_chat, gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt
+from rag.prompts.prompts import begin_chat, gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, short_memory
 from rag.utils import num_tokens_from_string, rmSpace
 from rag.utils.tavily_conn import Tavily
 
@@ -456,16 +456,16 @@ def chat(dialog, messages, stream=True, **kwargs):
     bind_models_ts = timer()
 
     # Send initial simple response to acknowledge user's intent before retrieval
-    print("=== START: Sending initial simple response via chat_solo_simple before retrieval ===")
+    #print("=== START: Sending initial simple response via chat_solo_simple before retrieval ===")
     initial_answer = ""
-    if stream:
-        for ans in chat_solo_simple(dialog, messages[-1], stream):
-            initial_answer = ans.get("answer", "")
-            print(f"=== YIELDING simple answer: {initial_answer[:50]}... ===")
-            yield ans
-        print(f"=== DONE: Simple answer sent. Starting retrieval... ===")
-    if initial_answer:
-        initial_answer += "\n"
+    # if stream:
+    #     for ans in chat_solo_simple(dialog, messages[-1], stream):
+    #         initial_answer = ans.get("answer", "")
+    #         print(f"=== YIELDING simple answer: {initial_answer[:50]}... ===")
+    #         yield ans
+    #     print(f"=== DONE: Simple answer sent. Starting retrieval... ===")
+    # if initial_answer:
+    #     initial_answer += "\n"
     retriever = settings.retrievaler
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
@@ -491,9 +491,11 @@ def chat(dialog, messages, stream=True, **kwargs):
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
 
     if len(questions) > 1 and prompt_config.get("refine_multiturn"):
+        #memory    =  short_memory(dialog.tenant_id, dialog.llm_id, messages)
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
+        #memory = ""
 
     if prompt_config.get("cross_languages"):
         questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
