@@ -101,6 +101,12 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
     print(f"[MEMORY DEBUG] Messages count: {len(messages)}")
     print(f"{'='*60}\n")
     
+    def truncate_memory(text, max_words=100):
+        words = text.strip().split()
+        if len(words) > max_words:
+            text = " ".join(words[:max_words])
+        return text.strip()
+
     def _generate_memory():
         """Inner function that runs in background thread"""
         try:
@@ -109,7 +115,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             
             # Call LLM to generate memory summary
             memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages, short_memory=old_memory)
-            
+            memory_text = truncate_memory(memory_text, max_words=100)
             print(f"[MEMORY THREAD] short_memory() returned: {memory_text[:100] if memory_text else 'None'}...")
             
             if memory_text:
