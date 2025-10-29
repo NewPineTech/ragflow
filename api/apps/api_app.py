@@ -16,6 +16,8 @@
 import json
 import os
 import re
+import logging
+import threading
 from datetime import datetime, timedelta
 from flask import request, Response
 from api.db.services.llm_service import LLMBundle
@@ -46,6 +48,52 @@ from api.db.services.canvas_service import UserCanvasService
 from agent.canvas import Canvas
 from functools import partial
 from pathlib import Path
+from rag.utils.redis_conn import REDIS_CONN
+from rag.prompts.prompts import short_memory
+
+
+# Memory management helpers
+def get_memory_key(conversation_id):
+    """Generate Redis key for conversation memory"""
+    return f"conv_memory:{conversation_id}"
+
+
+def get_memory_from_redis(conversation_id):
+    """Get memory from Redis for a conversation"""
+    try:
+        memory_key = get_memory_key(conversation_id)
+        memory = REDIS_CONN.get(memory_key)
+        return memory if memory else None
+    except Exception as e:
+        logging.warning(f"Failed to get memory from Redis: {e}")
+        return None
+
+
+def save_memory_to_redis(conversation_id, memory, expire_hours=24):
+    """Save memory to Redis for a conversation"""
+    try:
+        memory_key = get_memory_key(conversation_id)
+        # Expire after 24 hours by default
+        REDIS_CONN.set(memory_key, memory, exp=expire_hours * 3600)
+        return True
+    except Exception as e:
+        logging.warning(f"Failed to save memory to Redis: {e}")
+        return False
+
+
+def generate_and_save_memory_async(conversation_id, dialog, messages):
+    """Generate memory and save to Redis asynchronously (non-blocking)"""
+    def _generate_memory():
+        try:
+            memory = short_memory(dialog.tenant_id, dialog.llm_id, messages)
+            save_memory_to_redis(conversation_id, memory)
+            logging.info(f"Memory generated and saved for conversation: {conversation_id}")
+        except Exception as e:
+            logging.error(f"Failed to generate memory for conversation {conversation_id}: {e}")
+    
+    # Run in background thread to not block response
+    thread = threading.Thread(target=_generate_memory, daemon=True)
+    thread.start()
 
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
@@ -300,8 +348,16 @@ def completion():
         e, dia = DialogService.get_by_id(conv.dialog_id)
         if not e:
             return get_data_error_result(message="Dialog not found!")
+        
+        conversation_id = req["conversation_id"]
         del req["conversation_id"]
         del req["messages"]
+
+        # Get memory from Redis and pass to chat
+        memory = get_memory_from_redis(conversation_id)
+        if memory:
+            req["short_memory"] = memory
+            logging.info(f"Using memory from Redis for conversation: {conversation_id}")
 
         if not conv.reference:
             conv.reference = []
@@ -309,7 +365,7 @@ def completion():
         conv.reference.append({"chunks": [], "doc_aggs": []})
 
         def stream():
-            nonlocal dia, msg, req, conv
+            nonlocal dia, msg, req, conv, conversation_id
             try:
                 for ans in chat(dia, msg, True, **req):
                     fillin_conv(ans)
@@ -317,6 +373,8 @@ def completion():
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                                ensure_ascii=False) + "\n\n"
                 API4ConversationService.append_message(conv.id, conv.to_dict())
+                # Generate and save memory asynchronously after response sent
+                generate_and_save_memory_async(conversation_id, dia, conv.message)
             except Exception as e:
                 yield "data:" + json.dumps({"code": 500, "message": str(e),
                                             "data": {"answer": "**ERROR**: " + str(e), "reference": []}},
@@ -338,6 +396,10 @@ def completion():
             API4ConversationService.append_message(conv.id, conv.to_dict())
             break
         rename_field(answer)
+        
+        # Generate and save memory asynchronously after response sent
+        generate_and_save_memory_async(conversation_id, dia, conv.message)
+        
         return get_json_result(data=answer)
 
     except Exception as e:
