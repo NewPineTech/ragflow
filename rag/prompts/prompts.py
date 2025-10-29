@@ -156,6 +156,7 @@ ASK_SUMMARY = load_prompt("ask_summary")
 
 QUESTION_CLASSIFY_TEMPLATE = load_prompt("question_classify")
 BEGIN_ANSWER_TEMPLATE = load_prompt("begin_answer")
+MEMORY_PROMPT = load_prompt("short_term_memory_prompt")
 
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
@@ -495,3 +496,32 @@ def begin_chat(tenant_id=None, llm_id=None,  messages=[], language=None, chat_md
     ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
     return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
 
+
+def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, language=None, chat_mdl=None):
+    from api.db import LLMType
+    from api.db.services.llm_service import LLMBundle
+    from api.db.services.tenant_llm_service import TenantLLMService
+
+    if not chat_mdl:
+        if TenantLLMService.llm_id2llm_type(llm_id) == "image2text":
+            chat_mdl = LLMBundle(tenant_id, LLMType.IMAGE2TEXT, llm_id)
+        else:
+            chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
+    conv = []
+    for m in messages:
+        if m["role"] not in ["user", "assistant"]:
+            continue
+        conv.append("{}: {}".format(m["role"].upper(), m["content"]))
+    conversation = "\n".join(conv)
+    if short_memory:
+        conversation += "Historical memory:\n"
+        conversation += short_memory
+    template = PROMPT_JINJA_ENV.from_string(MEMORY_PROMPT)
+    rendered_prompt = template.render(
+        conversation=conversation,
+        language=language,
+    )
+
+    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
+    return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
