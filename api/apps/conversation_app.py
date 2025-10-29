@@ -16,6 +16,7 @@
 import json
 import re
 import traceback
+import logging
 from copy import deepcopy
 from flask import Response, request
 from flask_login import current_user, login_required
@@ -29,6 +30,7 @@ from api.db.services.search_service import SearchService
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserTenantService
 from api.utils.api_utils import get_data_error_result, get_json_result, server_error_response, validate_request
+from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 from rag.prompts.prompt_template import load_prompt
 from rag.prompts.prompts import chunks_format
 
@@ -196,10 +198,31 @@ def completion():
         e, conv = ConversationService.get_by_id(req["conversation_id"])
         if not e:
             return get_data_error_result(message="Conversation not found!")
+        
+        # Save conversation_id before deleting from req
+        conversation_id = req["conversation_id"]
+        
+        print(f"\n{'='*60}")
+        print(f"[CONVERSATION] Processing conversation: {conversation_id}")
+        print(f"[CONVERSATION] Stream mode: {req.get('stream', True)}")
+        print(f"{'='*60}\n")
+        
         conv.message = deepcopy(req["messages"])
         e, dia = DialogService.get_by_id(conv.dialog_id)
         if not e:
             return get_data_error_result(message="Dialog not found!")
+        
+        # Load memory from Redis BEFORE deleting from req
+        logging.info(f"[MEMORY] Attempting to load memory for conversation: {conversation_id}")
+        memory = get_memory_from_redis(conversation_id)
+        if memory:
+            req["short_memory"] = memory
+            logging.info(f"[MEMORY] ✓ Using memory from Redis for conversation: {conversation_id}")
+            print(f"[MEMORY] Loaded memory: {memory[:150]}...")
+        else:
+            logging.info(f"[MEMORY] No existing memory for conversation: {conversation_id}")
+            print(f"[MEMORY] No existing memory found")
+        
         del req["conversation_id"]
         del req["messages"]
 
@@ -218,13 +241,22 @@ def completion():
 
         is_embedded = bool(chat_model_id)
         def stream():
-            nonlocal dia, msg, req, conv
+            nonlocal dia, msg, req, conv, conversation_id
             try:
                 for ans in chat(dia, msg, True, **req):
                     ans = structure_answer(conv, ans, message_id, conv.id)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
+                
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
+                
+                # Generate memory AFTER chat completes
+                print(f"\n[STREAM] Chat completed, generating memory...")
+                print(f"[STREAM] conversation_id: {conversation_id}")
+                print(f"[STREAM] conv.message length: {len(conv.message)}")
+                generate_and_save_memory_async(conversation_id, dia, conv.message)
+                print(f"[STREAM] Memory generation triggered\n")
+                
             except Exception as e:
                 traceback.print_exc()
                 yield "data:" + json.dumps({"code": 500, "message": str(e), "data": {"answer": "**ERROR**: " + str(e), "reference": []}}, ensure_ascii=False) + "\n\n"
@@ -245,6 +277,14 @@ def completion():
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
                 break
+            
+            # Generate memory after non-stream chat
+            print(f"\n[NON-STREAM] Chat completed, generating memory...")
+            print(f"[NON-STREAM] conversation_id: {conversation_id}")
+            print(f"[NON-STREAM] conv.message length: {len(conv.message)}")
+            generate_and_save_memory_async(conversation_id, dia, conv.message)
+            print(f"[NON-STREAM] Memory generation triggered\n")
+            
             return get_json_result(data=answer)
     except Exception as e:
         return server_error_response(e)
