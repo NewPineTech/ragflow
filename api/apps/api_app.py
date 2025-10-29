@@ -83,38 +83,62 @@ def save_memory_to_redis(conversation_id, memory, expire_hours=24):
 
 def generate_and_save_memory_async(conversation_id, dialog, messages):
     """Generate memory and save to Redis asynchronously (non-blocking)"""
+    print(f"\n{'='*60}")
+    print(f"[MEMORY DEBUG] Function called for: {conversation_id}")
+    print(f"[MEMORY DEBUG] Dialog object: {dialog}")
+    print(f"[MEMORY DEBUG] Messages count: {len(messages)}")
+    print(f"{'='*60}\n")
+    
     def _generate_memory():
         try:
+            print(f"[MEMORY THREAD] Inside thread for: {conversation_id}")
             logging.info(f"[MEMORY] Starting memory generation for conversation: {conversation_id}")
             logging.debug(f"[MEMORY] Dialog tenant_id: {dialog.tenant_id}, llm_id: {dialog.llm_id}")
             logging.debug(f"[MEMORY] Messages count: {len(messages)}")
             
+            print(f"[MEMORY THREAD] About to call short_memory()...")
             # Generate memory using LLM
             memory = short_memory(dialog.tenant_id, dialog.llm_id, messages)
+            print(f"[MEMORY THREAD] short_memory() returned: {memory[:100] if memory else 'None'}...")
             
             if not memory:
                 logging.warning(f"[MEMORY] Empty memory generated for conversation: {conversation_id}")
+                print(f"[MEMORY THREAD] WARNING: Empty memory!")
                 return
             
             logging.info(f"[MEMORY] Memory generated successfully: {memory[:100]}...")
+            print(f"[MEMORY THREAD] Calling save_memory_to_redis()...")
             
             # Save to Redis
             success = save_memory_to_redis(conversation_id, memory)
+            print(f"[MEMORY THREAD] Save result: {success}")
+            
             if success:
                 logging.info(f"[MEMORY] ✓ Memory saved to Redis for conversation: {conversation_id}")
+                print(f"[MEMORY THREAD] ✓ SUCCESS - Memory saved!")
             else:
                 logging.error(f"[MEMORY] ✗ Failed to save memory to Redis for conversation: {conversation_id}")
+                print(f"[MEMORY THREAD] ✗ FAILED - Could not save!")
                 
         except Exception as e:
+            print(f"[MEMORY THREAD] ✗ EXCEPTION: {e}")
             logging.error(f"[MEMORY] ✗ Exception in memory generation for conversation {conversation_id}: {e}", exc_info=True)
+            import traceback
+            traceback.print_exc()
     
     # Run in background thread to not block response
     try:
+        print(f"[MEMORY DEBUG] Creating thread...")
         thread = threading.Thread(target=_generate_memory, daemon=True, name=f"MemoryGen-{conversation_id[:8]}")
+        print(f"[MEMORY DEBUG] Starting thread...")
         thread.start()
+        print(f"[MEMORY DEBUG] ✓ Thread started successfully!")
         logging.debug(f"[MEMORY] Background thread started for conversation: {conversation_id}")
     except Exception as e:
+        print(f"[MEMORY DEBUG] ✗ Failed to start thread: {e}")
         logging.error(f"[MEMORY] Failed to start background thread for conversation {conversation_id}: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
@@ -398,8 +422,14 @@ def completion():
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                                ensure_ascii=False) + "\n\n"
                 API4ConversationService.append_message(conv.id, conv.to_dict())
+                
                 # Generate and save memory asynchronously after response sent
+                print(f"\n[STREAM DEBUG] About to call generate_and_save_memory_async")
+                print(f"[STREAM DEBUG] conversation_id: {conversation_id}")
+                print(f"[STREAM DEBUG] dia type: {type(dia)}")
+                print(f"[STREAM DEBUG] conv.message length: {len(conv.message)}")
                 generate_and_save_memory_async(conversation_id, dia, conv.message)
+                print(f"[STREAM DEBUG] Returned from generate_and_save_memory_async\n")
             except Exception as e:
                 yield "data:" + json.dumps({"code": 500, "message": str(e),
                                             "data": {"answer": "**ERROR**: " + str(e), "reference": []}},
@@ -423,7 +453,12 @@ def completion():
         rename_field(answer)
         
         # Generate and save memory asynchronously after response sent
+        print(f"\n[NON-STREAM DEBUG] About to call generate_and_save_memory_async")
+        print(f"[NON-STREAM DEBUG] conversation_id: {conversation_id}")
+        print(f"[NON-STREAM DEBUG] dia type: {type(dia)}")
+        print(f"[NON-STREAM DEBUG] conv.message length: {len(conv.message)}")
         generate_and_save_memory_async(conversation_id, dia, conv.message)
+        print(f"[NON-STREAM DEBUG] Returned from generate_and_save_memory_async\n")
         
         return get_json_result(data=answer)
 
