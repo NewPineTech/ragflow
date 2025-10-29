@@ -21,7 +21,7 @@ Handles Redis-based storage and LLM-powered memory generation.
 import logging
 import threading
 import traceback
-from api.db import REDIS_CONN
+from rag.utils.redis_conn import REDIS_CONN
 from rag.prompts.prompts import short_memory
 
 
