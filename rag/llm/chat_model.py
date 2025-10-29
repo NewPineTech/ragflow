@@ -154,7 +154,7 @@ class Base(ABC):
         return ans, self.total_token_count(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
-        logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
+        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         reasoning_start = False
         response = self.client.chat.completions.create(model=self.model_name, messages=history, stream=True, **gen_conf, stop=kwargs.get("stop"))
         for resp in response:
@@ -1433,7 +1433,7 @@ class LiteLLMBase(ABC):
         return ans, self.total_token_count(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
-        logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
+        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         reasoning_start = False
 
         completion_args = self._construct_completion_args(history=history, stream=True, tools=False, **gen_conf)

@@ -490,12 +490,16 @@ def chat(dialog, messages, stream=True, **kwargs):
             raise KeyError("Miss parameter: " + p["key"])
         if p["key"] not in kwargs:
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
-
+    # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
+    memory_text = kwargs.pop("short_memory", None)
+  
     if len(questions) > 1 and prompt_config.get("refine_multiturn"):
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
 
+    logging.info("Final questions: {}, memory: {} ".format(" ".join(questions), memory_text))
+   
     if prompt_config.get("cross_languages"):
         questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
 
@@ -588,9 +592,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     # Thêm thông tin ngày giờ hiện tại
     datetime_info = get_current_datetime_info()
     
-    # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
-    memory_text = kwargs.pop("short_memory", None)
-    
+     
     gen_conf = dialog.llm_setting
 
     # Format system prompt với thông tin ngày giờ
@@ -692,7 +694,15 @@ def chat(dialog, messages, stream=True, **kwargs):
             f"  - Generated tokens(approximately): {tk_num}\n"
             f"  - Token speed: {int(tk_num / (generate_result_time_cost / 1000.0))}/s"
         )
-
+        logging.info("Time elapsed (ms): Total {:.1f}, Check LLM {:.1f}, Check Langfuse tracer {:.1f}, Bind models {:.1f}, Query refinement {:.1f}, Retrieval {:.1f}, Generate answer {:.1f}".format(
+            total_time_cost,
+            check_llm_time_cost,
+            check_langfuse_tracer_cost, 
+            bind_embedding_time_cost,
+            refine_question_time_cost,
+            retrieval_time_cost,
+            generate_result_time_cost
+        ))
         # Add a condition check to call the end method only if langfuse_tracer exists
         if langfuse_tracer and "langfuse_generation" in locals():
             langfuse_output = "\n" + re.sub(r"^.*?(### Query:.*)", r"\1", prompt, flags=re.DOTALL)
