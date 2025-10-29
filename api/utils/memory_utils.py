@@ -21,6 +21,7 @@ Handles Redis-based storage and LLM-powered memory generation.
 import logging
 import threading
 import traceback
+from typing import Optional
 from rag.utils.redis_conn import REDIS_CONN
 from rag.prompts.prompts import short_memory
 
@@ -38,7 +39,7 @@ def get_memory_key(conversation_id: str) -> str:
     return f"conv_memory:{conversation_id}"
 
 
-def get_memory_from_redis(conversation_id: str) -> str:
+def get_memory_from_redis(conversation_id: str) -> Optional[str]:
     """
     Load memory from Redis for a conversation.
     
