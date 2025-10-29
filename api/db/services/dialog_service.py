@@ -607,7 +607,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     system_content = f"{datetime_info}\n\n{system_content}"
     msg = [{"role": "system", "content": system_content}]
     if memory_text:
-        msg.extend([{"role": "assistant", "content": f"(ghi nhớ ngữ cảnh: {memory_context})"}])
+        msg.extend([{"role": "assistant", "content": f"(ghi nhớ ngữ cảnh: {memory_text})"}])
         logging.info(f"Memory added to message: {memory_text[:100]}...")
    
     prompt4citation = ""
