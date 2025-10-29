@@ -607,13 +607,26 @@ def chat(dialog, messages, stream=True, **kwargs):
     system_content = f"{datetime_info}\n\n{system_content}"
     if memory_text:
         system_content = f"{system_content}\n\n## Historical Memory:\n{memory_text}"
-        logging.info(f"Memory added to system prompt: {memory_text}")
+        logging.info(f"Memory added to system prompt: {memory_text[:100]}...")
     
     msg = [{"role": "system", "content": system_content}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
-    msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"])
+    
+    # Nếu có memory, chỉ gửi câu hỏi cuối cùng (memory đã chứa context lịch sử)
+    # Nếu không có memory, gửi toàn bộ lịch sử chat
+    if memory_text:
+        logging.info("[MEMORY] Using memory - only sending last user message to LLM")
+        print("[MEMORY] Using memory context - sending only last message")
+        # Chỉ lấy message cuối cùng từ user
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages[-1:] if m["role"] != "system"])
+    else:
+        logging.info("[MEMORY] No memory - sending full conversation history to LLM")
+        print("[MEMORY] No memory - sending full history")
+        # Gửi toàn bộ lịch sử
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"])
+    
     used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     prompt = msg[0]["content"]

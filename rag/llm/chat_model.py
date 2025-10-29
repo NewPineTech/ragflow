@@ -140,7 +140,7 @@ class Base(ABC):
         return gen_conf
 
     def _chat(self, history, gen_conf, **kwargs):
-        #logging.info("[HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
+        logging.info("[LLM BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2))
         if self.model_name.lower().find("qwen3") >= 0:
             kwargs["extra_body"] = {"enable_thinking": False}
         response = self.client.chat.completions.create(model=self.model_name, messages=history, **gen_conf, **kwargs)
@@ -154,35 +154,43 @@ class Base(ABC):
         return ans, self.total_token_count(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
-        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
-        reasoning_start = False
-        response = self.client.chat.completions.create(model=self.model_name, messages=history, stream=True, stream_options={"include_usage": False},
-                                                       **gen_conf, stop=kwargs.get("stop"))
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=history,
+            stream=True,
+            stream_options={"include_usage": False},
+            **gen_conf,
+            stop=kwargs.get("stop")
+        )
+
+        reasoning_mode = kwargs.get("with_reasoning", False)
+        reasoning_open = False
+        total_tokens = 0
+
         for resp in response:
             if not resp.choices:
                 continue
-            if not resp.choices[0].delta.content:
-                resp.choices[0].delta.content = ""
-            if kwargs.get("with_reasoning", True) and hasattr(resp.choices[0].delta, "reasoning_content") and resp.choices[0].delta.reasoning_content:
-                ans = ""
-                if not reasoning_start:
-                    reasoning_start = True
-                    ans = "<think>"
-                ans += resp.choices[0].delta.reasoning_content + "</think>"
-            else:
-                reasoning_start = False
-                ans = resp.choices[0].delta.content
 
-            tol = self.total_token_count(resp)
-            if not tol:
-                tol = num_tokens_from_string(resp.choices[0].delta.content)
+            choice = resp.choices[0]
+            delta = choice.delta
+            text = delta.content or ""
 
-            if resp.choices[0].finish_reason == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
-            yield ans, tol
+            # Handle reasoning tokens
+            if reasoning_mode and getattr(delta, "reasoning_content", None):
+                if not reasoning_open:
+                    reasoning_open = True
+                    yield "<think>", total_tokens
+                text = delta.reasoning_content
+            elif reasoning_open and choice.finish_reason in ("stop", "length"):
+                reasoning_open = False
+                yield "</think>", total_tokens
+
+            total_tokens += len(text.split())  # nhẹ hơn num_tokens_from_string
+            if choice.finish_reason == "length":
+                text += LENGTH_NOTIFICATION_CN if is_chinese(text) else LENGTH_NOTIFICATION_EN
+
+            yield text, total_tokens
+
 
     def _length_stop(self, ans):
         if is_chinese([ans]):
