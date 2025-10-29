@@ -605,11 +605,11 @@ def chat(dialog, messages, stream=True, **kwargs):
     
     # Thêm datetime info và memory vào system prompt
     system_content = f"{datetime_info}\n\n{system_content}"
-    if memory_text:
-        system_content = f"{system_content}\n\n## Historical Memory:\n{memory_text}"
-        logging.info(f"Memory added to system prompt: {memory_text[:100]}...")
-    
     msg = [{"role": "system", "content": system_content}]
+    if memory_text:
+        msg.extend([{"role": "assistant", "content": f"(ghi nhớ ngữ cảnh: {memory_context})"}])
+        logging.info(f"Memory added to message: {memory_text[:100]}...")
+   
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
