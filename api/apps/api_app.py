@@ -85,15 +85,36 @@ def generate_and_save_memory_async(conversation_id, dialog, messages):
     """Generate memory and save to Redis asynchronously (non-blocking)"""
     def _generate_memory():
         try:
+            logging.info(f"[MEMORY] Starting memory generation for conversation: {conversation_id}")
+            logging.debug(f"[MEMORY] Dialog tenant_id: {dialog.tenant_id}, llm_id: {dialog.llm_id}")
+            logging.debug(f"[MEMORY] Messages count: {len(messages)}")
+            
+            # Generate memory using LLM
             memory = short_memory(dialog.tenant_id, dialog.llm_id, messages)
-            save_memory_to_redis(conversation_id, memory)
-            logging.info(f"Memory generated and saved for conversation: {conversation_id}")
+            
+            if not memory:
+                logging.warning(f"[MEMORY] Empty memory generated for conversation: {conversation_id}")
+                return
+            
+            logging.info(f"[MEMORY] Memory generated successfully: {memory[:100]}...")
+            
+            # Save to Redis
+            success = save_memory_to_redis(conversation_id, memory)
+            if success:
+                logging.info(f"[MEMORY] ✓ Memory saved to Redis for conversation: {conversation_id}")
+            else:
+                logging.error(f"[MEMORY] ✗ Failed to save memory to Redis for conversation: {conversation_id}")
+                
         except Exception as e:
-            logging.error(f"Failed to generate memory for conversation {conversation_id}: {e}")
+            logging.error(f"[MEMORY] ✗ Exception in memory generation for conversation {conversation_id}: {e}", exc_info=True)
     
     # Run in background thread to not block response
-    thread = threading.Thread(target=_generate_memory, daemon=True)
-    thread.start()
+    try:
+        thread = threading.Thread(target=_generate_memory, daemon=True, name=f"MemoryGen-{conversation_id[:8]}")
+        thread.start()
+        logging.debug(f"[MEMORY] Background thread started for conversation: {conversation_id}")
+    except Exception as e:
+        logging.error(f"[MEMORY] Failed to start background thread for conversation {conversation_id}: {e}")
 
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
@@ -354,10 +375,14 @@ def completion():
         del req["messages"]
 
         # Get memory from Redis and pass to chat
+        logging.info(f"[MEMORY] Attempting to load memory for conversation: {conversation_id}")
         memory = get_memory_from_redis(conversation_id)
         if memory:
             req["short_memory"] = memory
-            logging.info(f"Using memory from Redis for conversation: {conversation_id}")
+            logging.info(f"[MEMORY] ✓ Using memory from Redis for conversation: {conversation_id}")
+            logging.debug(f"[MEMORY] Memory content: {memory[:200]}...")
+        else:
+            logging.info(f"[MEMORY] No existing memory found for conversation: {conversation_id}")
 
         if not conv.reference:
             conv.reference = []
