@@ -156,7 +156,8 @@ class Base(ABC):
     def _chat_streamly(self, history, gen_conf, **kwargs):
         #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         reasoning_start = False
-        response = self.client.chat.completions.create(model=self.model_name, messages=history, stream=True, **gen_conf, stop=kwargs.get("stop"))
+        response = self.client.chat.completions.create(model=self.model_name, messages=history, stream=True, stream_options={"include_usage": False},
+                                                       **gen_conf, stop=kwargs.get("stop"))
         for resp in response:
             if not resp.choices:
                 continue

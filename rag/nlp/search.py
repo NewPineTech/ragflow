@@ -23,6 +23,7 @@ from rag.settings import TAG_FLD, PAGERANK_FLD
 from rag.utils import rmSpace, get_float
 from rag.nlp import rag_tokenizer, query
 import numpy as np
+from rag.utils.cache_utils import cache_retrieval
 from rag.utils.doc_store_conn import DocStoreConnection, MatchDenseExpr, FusionExpr, OrderByExpr
 
 
@@ -344,6 +345,7 @@ class Dealer:
                                            rag_tokenizer.tokenize(ans).split(),
                                            rag_tokenizer.tokenize(inst).split())
 
+    @cache_retrieval(ttl=120)
     def retrieval(self, question, embd_mdl, tenant_ids, kb_ids, page, page_size, similarity_threshold=0.2,
                   vector_similarity_weight=0.3, top=1024, doc_ids=None, aggs=True,
                   rerank_mdl=None, highlight=False,
