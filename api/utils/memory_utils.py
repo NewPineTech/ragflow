@@ -74,8 +74,12 @@ def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 
     """
     try:
         key = get_memory_key(conversation_id)
-        REDIS_CONN.set(key, memory, ex=expire_hours * 3600)
-        return True
+        # RedisDB.set(k, v, exp) - exp is in seconds (positional argument)
+        expire_seconds = expire_hours * 3600
+        result = REDIS_CONN.set(key, memory, expire_seconds)
+        if result:
+            logging.info(f"[MEMORY] Successfully saved memory to Redis: {key}")
+        return result
     except Exception as e:
         logging.error(f"[MEMORY] Failed to save memory to Redis: {e}")
         return False
