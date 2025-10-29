@@ -605,7 +605,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     system_content = f"{datetime_info}\n\n{system_content}"
     if memory_text:
         system_content = f"{system_content}\n\n## Historical Memory:\n{memory_text}"
-        logging.info("Memory added to system prompt")
+        logging.info(f"Memory added to system prompt: {memory_text}")
     
     msg = [{"role": "system", "content": system_content}]
     prompt4citation = ""
