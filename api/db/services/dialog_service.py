@@ -604,10 +604,10 @@ def chat(dialog, messages, stream=True, **kwargs):
         system_content = prompt_config["system"]
     
     # Thêm datetime info và memory vào system prompt
-    system_content = f"{datetime_info}\n\n{system_content}"
+    system_content = f"{system_content}\n## Context:{datetime_info}"
     msg = [{"role": "system", "content": system_content}]
     if memory_text:
-        msg.extend([{"role": "assistant", "content": f"(ghi nhớ ngữ cảnh: {memory_text})"}])
+        msg.extend([{"role": "assistant", "content": f"##History Memory: {memory_text}"}])
         logging.info(f"Memory added to message: {memory_text[:100]}...")
    
     prompt4citation = ""
