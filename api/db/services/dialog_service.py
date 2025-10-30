@@ -587,15 +587,13 @@ def chat(dialog, messages, stream=True, **kwargs):
         yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions), "audio_binary": tts(tts_mdl, empty_res)}
         return {"answer": prompt_config["empty_response"], "reference": kbinfos}
 
-    kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
-    
+    kwargs["knowledge"] = ""
     # Thêm thông tin ngày giờ hiện tại
     datetime_info = get_current_datetime_info()
     
      
     gen_conf = dialog.llm_setting
 
-    # Format system prompt với thông tin ngày giờ
     try:
         system_content = prompt_config["system"].format(**kwargs)
     except KeyError as e:
@@ -603,6 +601,7 @@ def chat(dialog, messages, stream=True, **kwargs):
         logging.warning(f"Missing parameter in system prompt: {e}")
         system_content = prompt_config["system"]
     
+    # Format system prompt với thông tin ngày giờ
     # Thêm datetime info và memory vào system prompt
     system_content = f"{system_content}\n## Context:{datetime_info}"
     msg = [{"role": "system", "content": system_content}]
@@ -610,6 +609,10 @@ def chat(dialog, messages, stream=True, **kwargs):
         msg.extend([{"role": "assistant", "content": f"##History Memory: {memory_text}"}])
         logging.info(f"Memory added to message: {memory_text[:100]}...")
    
+    if knowledges:
+        kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
+        msg.extend([{"role": "assitant", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
