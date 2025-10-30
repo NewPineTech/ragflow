@@ -611,7 +611,7 @@ def chat(dialog, messages, stream=True, **kwargs):
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        msg.extend([{"role": "assitant", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+        msg.extend([{"role": "assistant", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
 
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
