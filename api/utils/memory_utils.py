@@ -112,10 +112,12 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
         try:
             print(f"[MEMORY THREAD] Inside thread for: {conversation_id}")
             print(f"[MEMORY THREAD] About to call short_memory()...")
-            if old_memory:
-                messages=messages[-2:]
+            
+            # Nếu đã có old_memory, chỉ cần 2 messages gần nhất
+            messages_to_use = messages[-2:] if old_memory else messages
+            
             # Call LLM to generate memory summary
-            memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages, short_memory=old_memory)
+            memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages_to_use, short_memory=old_memory)
             memory_text = truncate_memory(memory_text, max_words=100)
             print(f"[MEMORY THREAD] short_memory() returned: {memory_text[:100] if memory_text else 'None'}...")
             
