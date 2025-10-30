@@ -13,29 +13,58 @@ def _make_cache_key(func_name, query, kb_ids, top_k, **kwargs):
     return hashlib.md5(json.dumps(base, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-# ---- FIX: JSON encoder hỗ trợ numpy, ORM object, etc. ----
-class SafeJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
+def cache_retrieval(ttl: int = 60):
+    _cache_memory = {}
+
+    def safe_serialize(obj, _path="root"):
+        """
+        Đệ quy chuyển mọi đối tượng thành JSON-safe.
+        _path giúp ghi log vị trí trong cấu trúc khi lỗi.
+        """
         import numpy as np
+
         try:
-            if hasattr(obj, "to_dict"):
-                return obj.to_dict()
-            if hasattr(obj, "__dict__"):
-                return obj.__dict__
+            # Các kiểu cơ bản
+            if isinstance(obj, (str, int, float, bool)) or obj is None:
+                return obj
+
+            # numpy
             if isinstance(obj, (np.integer,)):
                 return int(obj)
             if isinstance(obj, (np.floating,)):
                 return float(obj)
             if isinstance(obj, (np.ndarray,)):
                 return obj.tolist()
-        except Exception:
-            pass
-        return str(obj)
 
-# ---- Cập nhật decorator ----
-def cache_retrieval(ttl: int = 60):
-    """Cache decorator cho retrieval với Redis hoặc memory fallback."""
-    _cache_memory = {}
+            # dict
+            if isinstance(obj, dict):
+                return {safe_serialize(k, f"{_path}.{k}"): safe_serialize(v, f"{_path}.{k}") for k, v in obj.items()}
+
+            # list / tuple / set
+            if isinstance(obj, (list, tuple, set)):
+                return [safe_serialize(i, f"{_path}[{idx}]") for idx, i in enumerate(obj)]
+
+            # Có phương thức to_dict
+            if hasattr(obj, "to_dict"):
+                try:
+                    return safe_serialize(obj.to_dict(), f"{_path}.to_dict()")
+                except Exception as e:
+                    print(f"[CACHE][WARN] to_dict() failed at {_path}: {e}")
+
+            # Có __dict__
+            if hasattr(obj, "__dict__"):
+                try:
+                    return safe_serialize(obj.__dict__, f"{_path}.__dict__")
+                except Exception as e:
+                    print(f"[CACHE][WARN] __dict__ failed at {_path}: {e}")
+
+            # Cuối cùng fallback sang str
+            print(f"[CACHE][WARN] Non-serializable object at {_path}: {type(obj).__name__} → using str()")
+            return str(obj)
+
+        except Exception as e:
+            print(f"[CACHE][ERROR] Failed to serialize {_path} ({type(obj).__name__}): {e}")
+            return str(obj)
 
     def decorator(func):
         @wraps(func)
@@ -45,7 +74,7 @@ def cache_retrieval(ttl: int = 60):
             top_k = kwargs.get("top", 5)
             cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, **kwargs)
 
-            # Redis
+            # 1️⃣ Kiểm tra Redis
             if REDIS_CONN:
                 data = REDIS_CONN.get(cache_key)
                 if data:
@@ -56,25 +85,28 @@ def cache_retrieval(ttl: int = 60):
                     except Exception:
                         pass
 
-            # Memory fallback
+            # 2️⃣ Kiểm tra memory cache
             if cache_key in _cache_memory:
                 result, ts = _cache_memory[cache_key]
                 if time.time() - ts < ttl:
                     result["_cached"] = True
                     return result
 
-            # Thực thi thật
+            # 3️⃣ Chạy thật
             result = func(*args, **kwargs)
 
+            # 4️⃣ Serialize an toàn
             try:
-                cache_data = json.dumps(result, ensure_ascii=False, cls=SafeJSONEncoder)
+                safe_data = safe_serialize(result)
+                cache_data = json.dumps(safe_data, ensure_ascii=False)
                 if REDIS_CONN:
-                    REDIS_CONN.setex(cache_key, ttl, cache_data)
+                    REDIS_CONN.set(cache_key, cache_data, ex=ttl)
                 else:
                     _cache_memory[cache_key] = (result, time.time())
             except Exception as e:
-                print(f"[CACHE] Serialization failed: {e}")
+                print(f"[CACHE][ERROR] Serialization failed for {func.__name__}: {e}")
 
             return result
+
         return wrapper
     return decorator
