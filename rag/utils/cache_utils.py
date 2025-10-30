@@ -1,15 +1,64 @@
-import json, time, hashlib
+import json, time, hashlib, re
 from functools import wraps
 from rag.utils.redis_conn import REDIS_CONN
+
+# Vietnamese stopwords - các từ phổ biến không mang nghĩa quan trọng
+VIETNAMESE_STOPWORDS = {
+    "và", "của", "có", "được", "đã", "để", "trong", "với", "cho", "từ",
+    "về", "theo", "như", "khi", "vì", "hay", "hoặc", "nhưng", "nếu", "mà",
+    "thì", "là", "một", "các", "này", "đó", "những", "bởi", "nên", "sẽ",
+    "đang", "rất", "còn", "vào", "ra", "không", "chỉ", "cũng", "đều", "sau",
+    "trước", "giữa", "bên", "ngoài", "bao", "nhiều", "ít", "cả", "mọi",
+    # English common stopwords
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "up", "about", "into", "through", "is", "are",
+    "was", "were", "been", "be", "have", "has", "had", "do", "does", "did"
+}
+
+def _normalize_query(query: str) -> str:
+    """
+    Normalize query để tăng cache hit rate:
+    1. Lowercase
+    2. Remove extra whitespace
+    3. Remove punctuation
+    4. Remove stopwords
+    5. Sort words (để "A và B" == "B và A")
+    """
+    if not isinstance(query, str):
+        return query
+    
+    # 1. Lowercase
+    normalized = query.lower().strip()
+    
+    # 2. Remove punctuation, giữ lại chữ cái, số, khoảng trắng
+    normalized = re.sub(r'[^\w\s]', ' ', normalized)
+    
+    # 3. Remove extra whitespace
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+    
+    # 4. Split thành words
+    words = normalized.split()
+    
+    # 5. Remove stopwords
+    words = [w for w in words if w not in VIETNAMESE_STOPWORDS]
+    
+    # 6. Sort words để "phật giáo là gì" == "gì là phật giáo"
+    words.sort()
+    
+    # 7. Join lại
+    return ' '.join(words)
 
 def _make_cache_key(func_name, query, kb_ids, top_k, **kwargs):
     """Generate cache key from function parameters"""
     # Sort kb_ids để đảm bảo cache key giống nhau cho cùng KB set
     kb_ids_sorted = sorted(kb_ids) if isinstance(kb_ids, list) else kb_ids
     
+    # Normalize query để tăng cache hit
+    normalized_query = _normalize_query(query)
+    
     base = {
         "func": func_name,
-        "query": query.strip().lower() if isinstance(query, str) else query,  # Normalize query
+        "query": normalized_query,
         "kb_ids": kb_ids_sorted,
         "top_k": top_k,
         # Chỉ cache những params quan trọng, skip models
