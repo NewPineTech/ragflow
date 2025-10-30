@@ -69,7 +69,13 @@ def cache_retrieval(ttl: int = 60):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            query = args[0] if len(args) > 0 else kwargs.get("query", "")
+            # Skip 'self' for instance methods
+            # If args[0] is an object (not str/int/etc), assume it's self
+            start_idx = 0
+            if len(args) > 0 and hasattr(args[0], '__dict__'):
+                start_idx = 1  # Skip self
+            
+            query = args[start_idx] if len(args) > start_idx else kwargs.get("question", kwargs.get("query", ""))
             kb_ids = kwargs.get("kb_ids", [])
             top_k = kwargs.get("top", 5)
             cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, **kwargs)
