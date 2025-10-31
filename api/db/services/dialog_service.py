@@ -606,12 +606,12 @@ def chat(dialog, messages, stream=True, **kwargs):
     system_content = f"{system_content}\n## Context:{datetime_info}"
     msg = [{"role": "system", "content": system_content}]
     if memory_text:
-        msg.extend([{"role": "assistant", "content": f"##History Memory: {memory_text}"}])
+        msg.extend([{"role": "system", "content": f"##Memory: {memory_text}"}])
         logging.info(f"Memory added to message: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        msg.extend([{"role": "assistant", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+        msg.extend([{"role": "system", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
 
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
