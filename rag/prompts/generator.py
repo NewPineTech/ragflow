@@ -164,15 +164,9 @@ MEMORY_PROMPT = load_prompt("short_term_memory_prompt")
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
 
-<<<<<<< HEAD:rag/prompts/prompts.py
-def citation_prompt() -> str:
-     template = PROMPT_JINJA_ENV.from_string(CITATION_PROMPT_TEMPLATE)
-     return template.render()
-=======
 def citation_prompt(user_defined_prompts: dict={}) -> str:
     template = PROMPT_JINJA_ENV.from_string(user_defined_prompts.get("citation_guidelines", CITATION_PROMPT_TEMPLATE))
     return template.render()
->>>>>>> main:rag/prompts/generator.py
 
 
 def citation_plus(sources: str) -> str:
