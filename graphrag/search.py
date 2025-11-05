@@ -21,13 +21,14 @@ import json_repair
 import pandas as pd
 import trio
 
-from api.utils import get_uuid
+from common.misc_utils import get_uuid
 from graphrag.query_analyze_prompt import PROMPTS
-from graphrag.utils import get_entity_type2sampels, get_llm_cache, set_llm_cache, get_relation
-from rag.utils import num_tokens_from_string, get_float
+from graphrag.utils import get_entity_type2samples, get_llm_cache, set_llm_cache, get_relation
+from common.token_utils import num_tokens_from_string
 from rag.utils.doc_store_conn import OrderByExpr
 
 from rag.nlp.search import Dealer, index_name
+from common.float_utils import get_float
 
 
 class KGSearch(Dealer):
@@ -42,7 +43,7 @@ class KGSearch(Dealer):
         return response
 
     def query_rewrite(self, llm, question, idxnms, kb_ids):
-        ty2ents = trio.run(lambda: get_entity_type2sampels(idxnms, kb_ids))
+        ty2ents = trio.run(lambda: get_entity_type2samples(idxnms, kb_ids))
         hint_prompt = PROMPTS["minirag_query2kwd"].format(query=question,
                                                           TYPE_POOL=json.dumps(ty2ents, ensure_ascii=False, indent=2))
         result = self._chat(llm, hint_prompt, [{"role": "user", "content": "Output:"}], {})
@@ -314,7 +315,7 @@ class KGSearch(Dealer):
 if __name__ == "__main__":
     from api import settings
     import argparse
-    from api.db import LLMType
+    from common.constants import LLMType
     from api.db.services.knowledgebase_service import KnowledgebaseService
     from api.db.services.llm_service import LLMBundle
     from api.db.services.user_service import TenantService

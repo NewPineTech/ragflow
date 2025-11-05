@@ -21,7 +21,7 @@ import networkx as nx
 import trio
 
 from api import settings
-from api.db import LLMType
+from common.constants import LLMType
 from api.db.services.document_service import DocumentService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMBundle
@@ -62,7 +62,7 @@ async def main():
 
     chunks = [
         d["content_with_weight"]
-        for d in settings.retrievaler.chunk_list(
+        for d in settings.retriever.chunk_list(
             args.doc_id,
             args.tenant_id,
             [kb_id],
