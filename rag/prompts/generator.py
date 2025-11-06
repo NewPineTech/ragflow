@@ -19,6 +19,7 @@ import logging
 import re
 from copy import deepcopy
 from typing import Tuple
+from common.constants import LLMType
 import jinja2
 import json_repair
 import trio
@@ -455,7 +456,6 @@ def gen_meta_filter(chat_mdl, meta_data:dict, query: str) -> list:
 def question_classify_prompt(tenant_id=None, llm_id=None, content="", language=None, chat_mdl=None):
     if not content:
         return ""
-    from api.db import LLMTgitype
     from api.db.services.llm_service import LLMBundle
     from api.db.services.tenant_llm_service import TenantLLMService
 
