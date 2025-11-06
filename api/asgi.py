@@ -37,7 +37,7 @@ from api import settings
 from api.apps import app, smtp_mail_server
 from api.db.runtime_config import RuntimeConfig
 from api.db.services.document_service import DocumentService
-from api.utils import show_configs
+from common.config_utils import show_configs
 from api.versions import get_ragflow_version
 from rag.settings import print_rag_settings
 from rag.utils.mcp_tool_call_conn import shutdown_all_mcp_sessions
