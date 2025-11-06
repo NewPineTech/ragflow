@@ -28,10 +28,10 @@ import threading
 import time
 import uuid
 
-from api.utils.log_utils import init_root_logger
 from plugin import GlobalPluginManager
 
-init_root_logger("ragflow_server")
+logging.basicConfig(level=logging.INFO)
+logging.info("RAGFlow server starting...")
 
 from api import settings
 from api.apps import app, smtp_mail_server
