@@ -23,8 +23,8 @@ import threading
 import traceback
 from typing import Optional
 from rag.utils.redis_conn import REDIS_CONN
-from rag.prompts.prompts import short_memory
 
+from rag.prompts.generator import short_memory
 
 def get_memory_key(conversation_id: str) -> str:
     """

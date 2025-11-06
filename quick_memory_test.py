@@ -16,7 +16,7 @@ def test_imports():
         from rag.utils.redis_conn import REDIS_CONN
         print("✓ Redis import OK")
         
-        from rag.prompts.prompts import short_memory
+        from rag.prompts.generator import short_memory
         print("✓ short_memory import OK")
         
         from api.apps.api_app import get_memory_key, save_memory_to_redis, get_memory_from_redis
