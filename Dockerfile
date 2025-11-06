@@ -146,11 +146,11 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
     else \
         sed -i 's|pypi.tuna.tsinghua.edu.cn|pypi.org|g' uv.lock; \
     fi; \
-    if [ "$LIGHTEN" == "1" ]; then \
-        uv sync --python 3.10; \
-    else \
-        uv sync --python 3.10 --all-extras; \
-    fi
+    #if [ "$LIGHTEN" == "1" ]; then \
+    #    uv sync --python 3.10; \
+    #else \
+    uv sync --python 3.10 --all-extras; \
+    #fi
 
 COPY web web
 COPY docs docs
