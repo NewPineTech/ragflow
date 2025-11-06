@@ -500,7 +500,6 @@ def chat(dialog, messages, stream=True, **kwargs):
     #     print(f"=== DONE: Simple answer sent. Starting retrieval... ===")
     # if initial_answer:
     #     initial_answer += "\n"
-    retriever = settings.retrievaler
     retriever = settings.retriever
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
