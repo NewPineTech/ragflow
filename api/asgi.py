@@ -86,9 +86,10 @@ logging.info(r"""
 
 """)
 logging.info(f'RAGFlow version: {get_ragflow_version()}')
+from common.file_utils import get_project_base_directory
 
 from api import utils
-logging.info(f'project base: {utils.file_utils.get_project_base_directory()}')
+logging.info(f'project base: {get_project_base_directory()}')
 show_configs()
 settings.init_settings()
 print_rag_settings()
