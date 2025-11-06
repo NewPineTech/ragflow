@@ -475,7 +475,6 @@ def question_classify_prompt(tenant_id=None, llm_id=None, content="", language=N
 def begin_chat(tenant_id=None, llm_id=None,  messages=[], language=None, chat_mdl=None):
     if not messages:
         return ""
-    from api.db import LLMType
     from api.db.services.llm_service import LLMBundle
     from api.db.services.tenant_llm_service import TenantLLMService
 
@@ -509,7 +508,6 @@ def begin_chat(tenant_id=None, llm_id=None,  messages=[], language=None, chat_md
 
 
 def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, language=None, chat_mdl=None):
-    from api.db import LLMType
     from api.db.services.llm_service import LLMBundle
     from api.db.services.tenant_llm_service import TenantLLMService
 
