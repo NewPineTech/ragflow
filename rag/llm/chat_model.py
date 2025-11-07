@@ -1483,7 +1483,7 @@ class LiteLLMBase(ABC):
             ans = self._length_stop(ans)
         logging.info(f"[LLM RESPONSE] {ans}")
 
-        return ans, self.total_token_count(response)
+        return ans, total_token_count_from_response(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
         #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
