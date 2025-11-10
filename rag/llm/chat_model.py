@@ -1295,6 +1295,22 @@ class GoogleChat(Base):
             ans = ""
             total_tokens = 0
 
+            # 1. TRÍCH XUẤT VÀ LỌC SYSTEM TỪ HISTORY
+            system_instruction_text = ""
+            filtered_history = []
+            
+            # Giả định tin nhắn system luôn là tin nhắn đầu tiên
+            if history and history[0]["role"] == "system":
+                system_instruction_text = history[0]["content"]
+                # Bỏ qua tin nhắn system này khi xây dựng contents
+                filtered_history = history[1:] 
+            else:
+                filtered_history = history
+            
+            # Nếu tham số 'system' truyền vào có giá trị, appends nó vào đầu system_instruction_text
+            if system:
+                system_instruction_text = system + "\n" + system_instruction_text
+
             # Set default thinking_budget=0 if not specified
             if "thinking_budget" not in gen_conf:
                 gen_conf["thinking_budget"] = 0
@@ -1310,8 +1326,8 @@ class GoogleChat(Base):
                 raise
 
             config_dict = {}
-            if system:
-                config_dict["system_instruction"] = system
+            if system_instruction_text: # Sử dụng biến đã trích xuất/ưu tiên
+                config_dict["system_instruction"] = system_instruction_text
             if "temperature" in gen_conf:
                 config_dict["temperature"] = gen_conf["temperature"]
             if "top_p" in gen_conf:
@@ -1324,9 +1340,10 @@ class GoogleChat(Base):
 
             config = GenerateContentConfig(**config_dict)
 
-            # Convert history to google-genai Content format
+            # 2. Convert history đã lọc sang google-genai Content format
             contents = []
-            for item in history:
+            for item in filtered_history:
+                # Không cần kiểm tra item["role"] == "system" nữa vì đã lọc
                 # google-genai uses 'model' instead of 'assistant'
                 role = "model" if item["role"] == "assistant" else item["role"]
                 content = Content(
