@@ -26,7 +26,6 @@ from docx.opc.pkgreader import _SerializedRelationships, _SerializedRelationship
 from docx.opc.oxml import parse_xml
 from markdown import markdown
 from PIL import Image
-from tika import parser
 
 from common.constants import LLMType
 from api.db.services.llm_service import LLMBundle
@@ -725,6 +724,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         callback(0.1, "Start to parse.")
 
         binary = BytesIO(binary)
+        from tika import parser
         doc_parsed = parser.from_buffer(binary)
         if doc_parsed.get('content', None) is not None:
             sections = doc_parsed['content'].split('\n')
