@@ -67,7 +67,7 @@ class DoclingParser(RAGFlowPdfParser):
             self.logger.warning("[Docling] 'docling' is not importable, please: pip install docling")
             return False
         try:
-            _ = DocumentConverter(semantic_filter=True)
+            _ = DocumentConverter()
             return True
         except Exception as e:
             self.logger.error(f"[Docling] init DocumentConverter failed: {e}")
