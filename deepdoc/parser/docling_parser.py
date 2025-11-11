@@ -67,7 +67,7 @@ class DoclingParser(RAGFlowPdfParser):
             self.logger.warning("[Docling] 'docling' is not importable, please: pip install docling")
             return False
         try:
-            _ = DocumentConverter()
+            _ = DocumentConverter(semantic_filter=True)
             return True
         except Exception as e:
             self.logger.error(f"[Docling] init DocumentConverter failed: {e}")
@@ -158,32 +158,57 @@ class DoclingParser(RAGFlowPdfParser):
         return (pic, positions) if need_position else pic
 
     def _iter_doc_items(self, doc) -> Iterable[tuple[str, Any, Optional[_BBox]]]:
+        """
+        Iterate docling text elements, filtering out noise (toc, footer, header, notes)
+        """
         for t in getattr(doc, "texts", []):
-            parent=getattr(t, "parent", "")
-            ref=getattr(parent,"cref","")
-            label=getattr(t, "label", "")
-            if (label in ("section_header","text",) and ref in ("#/body",)) or label in ("list_item",):
-                text = getattr(t, "text", "") or ""
+            parent = getattr(t, "parent", "")
+            ref = getattr(parent, "cref", "")
+            label = getattr(t, "label", "")
+            text = getattr(t, "text", "") or ""
+            if not text.strip():
+                continue
+
+            # --- Lọc phần rác ---
+            lower = text.lower().strip()
+            # các pattern mục lục, chú thích, header/footer, số trang
+            if any(kw in lower for kw in ["mục lục", "chú thích", "tài liệu tham khảo", "phụ lục"]):
+                continue
+            if re.search(r'\.{3,}\s*\d+$', text):  # kiểu "Chương 1......12"
+                continue
+            if re.match(r'^\s*(trang|page)?\s*\d+\s*$', lower):  # chỉ số trang
+                continue
+            if len(text.strip()) < 10:  # đoạn quá ngắn
+                continue
+
+            # --- Chỉ lấy nội dung chính ---
+            if (label in ("section_header", "text") and ref in ("#/body",)) or label in ("list_item",):
                 bbox = None
                 if getattr(t, "prov", None):
                     pn = getattr(t.prov[0], "page_no", None)
                     bb = getattr(t.prov[0], "bbox", None)
-                    bb = [getattr(bb, "l", None),getattr(bb, "t", None),getattr(bb, "r", None),getattr(bb, "b", None)]
+                    bb = [getattr(bb, "l", None), getattr(bb, "t", None),
+                        getattr(bb, "r", None), getattr(bb, "b", None)]
                     if pn and bb and len(bb) == 4:
                         bbox = _BBox(page_no=int(pn), x0=bb[0], y0=bb[1], x1=bb[2], y1=bb[3])
-                yield (DoclingContentType.TEXT.value, text, bbox)
+                yield (DoclingContentType.TEXT.value, text.strip(), bbox)
 
+        # giữ nguyên phần phương trình nếu có
         for item in getattr(doc, "texts", []):
             if getattr(item, "label", "") in ("FORMULA",):
                 text = getattr(item, "text", "") or ""
+                if not text.strip():
+                    continue
                 bbox = None
                 if getattr(item, "prov", None):
                     pn = getattr(item.prov, "page_no", None)
                     bb = getattr(item.prov, "bbox", None)
-                    bb = [getattr(bb, "l", None),getattr(bb, "t", None),getattr(bb, "r", None),getattr(bb, "b", None)]
+                    bb = [getattr(bb, "l", None), getattr(bb, "t", None),
+                        getattr(bb, "r", None), getattr(bb, "b", None)]
                     if pn and bb and len(bb) == 4:
                         bbox = _BBox(int(pn), bb[0], bb[1], bb[2], bb[3])
-                yield (DoclingContentType.EQUATION.value, text, bbox)
+                yield (DoclingContentType.EQUATION.value, text.strip(), bbox)
+
 
     def _transfer_to_sections(self, doc) -> list[tuple[str, str]]:
         """

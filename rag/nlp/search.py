@@ -356,7 +356,7 @@ class Dealer:
                                            rag_tokenizer.tokenize(ans).split(),
                                            rag_tokenizer.tokenize(inst).split())
 
-    @cache_retrieval(ttl=3600) # Cache for 1 hour
+    @cache_retrieval(ttl=300) # Cache for 5 minutes
     def retrieval(self, question, embd_mdl, tenant_ids, kb_ids, page, page_size, similarity_threshold=0.2,
                   vector_similarity_weight=0.3, top=1024, doc_ids=None, aggs=True,
                   rerank_mdl=None, highlight=False,
