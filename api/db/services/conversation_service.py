@@ -20,7 +20,7 @@ from common.constants import StatusEnum
 from api.db.db_models import Conversation, DB
 from api.db.services.api_service import API4ConversationService
 from api.db.services.common_service import CommonService
-from api.db.services.dialog_service import DialogService, chat
+from api.db.services.dialog_service import DialogService, chat, chatv1
 from common.misc_utils import get_uuid
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 import json
@@ -28,6 +28,8 @@ import json
 from rag.prompts.generator import chunks_format
 
 
+use_v1 = True
+chat_func = chatv1 if use_v1 else chat
 class ConversationService(CommonService):
     model = Conversation
 
