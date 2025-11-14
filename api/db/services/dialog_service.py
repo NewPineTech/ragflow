@@ -281,27 +281,36 @@ Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
             if classify_type is None:
                 if "[CLASSIFY:KB]" in answer:
                     classify_type = "KB"
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected KB classification")
                     return classify_type, None  # No response needed for KB
                 elif "[CLASSIFY:GREET]" in answer:
                     classify_type = "GREET"
                     answer = answer.replace("[CLASSIFY:GREET]", "").strip()
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected GREET, answer after strip: {answer[:100]}")
                 elif "[CLASSIFY:SENSITIVE]" in answer:
                     classify_type = "SENSITIVE"
                     answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected SENSITIVE, answer after strip: {answer[:100]}")
             
             # Stream response for GREET/SENSITIVE
             if classify_type in ["GREET", "SENSITIVE"]:
                 delta_ans = answer[len(last_ans):]
-                if num_tokens_from_string(delta_ans) < 16:
-                    continue
-                last_ans = answer
-                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+                # Yield immediately if we have enough content (reduced threshold for faster response)
+                if len(answer) >= 10:  # Changed from token count to char count for simplicity
+                    if len(delta_ans) > 0:  # Yield any new content
+                        last_ans = answer
+                        logging.debug(f"[CLASSIFY_AND_RESPOND] Yielding delta: {delta_ans[:50]}...")
+                        yield {"answer": answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time()}
         
-        # Final chunk
+        # Final chunk - always yield to ensure response is sent
         if classify_type in ["GREET", "SENSITIVE"]:
-            delta_ans = answer[len(last_ans):]
-            if delta_ans:
+            if len(answer) > len(last_ans):  # Only if there's new content
+                delta_ans = answer[len(last_ans):]
+                logging.info(f"[CLASSIFY_AND_RESPOND] Final yield, answer length: {len(answer)}, delta: {len(delta_ans)}")
                 yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+            elif len(answer) > 0:  # Ensure we send at least the complete answer
+                logging.info(f"[CLASSIFY_AND_RESPOND] Final yield (complete answer): {answer[:100]}...")
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
     else:
         answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
         
