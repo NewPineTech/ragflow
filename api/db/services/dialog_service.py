@@ -1018,6 +1018,52 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
         msg.extend([{"role": "system", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
 
+    def strip_markdown(text):
+        """
+        Remove markdown formatting while preserving citations [ID:n].
+        Strips: **bold**, *italic*, __underline__, ~~strikethrough~~, #headers, etc.
+        """
+        # Preserve citations by replacing temporarily
+        citation_placeholder = {}
+        citation_pattern = r'\[ID:\d+\]'
+        for i, match in enumerate(re.finditer(citation_pattern, text)):
+            placeholder = f"__CITATION_{i}__"
+            citation_placeholder[placeholder] = match.group(0)
+            text = text.replace(match.group(0), placeholder, 1)
+        
+        # Remove markdown formatting
+        # Headers (##, ###, etc.)
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        # Bold (**text** or __text__)
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+        # Italic (*text* or _text_)
+        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
+        # Strikethrough (~~text~~)
+        text = re.sub(r'~~(.+?)~~', r'\1', text)
+        # Code blocks (```code```)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        # Inline code (`code`)
+        text = re.sub(r'`(.+?)`', r'\1', text)
+        # Links ([text](url))
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        # Images (![alt](url))
+        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
+        # Blockquotes (> text)
+        text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+        # Horizontal rules (---, ***, ___)
+        text = re.sub(r'^[-*_]{3,}$', '', text, flags=re.MULTILINE)
+        # Lists (- item, * item, 1. item)
+        text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
+        
+        # Restore citations
+        for placeholder, citation in citation_placeholder.items():
+            text = text.replace(placeholder, citation)
+        
+        return text
+
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
@@ -1182,8 +1228,9 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
-            answer = ans
-            delta_ans = ans[len(last_ans):]
+            # Strip markdown from answer
+            answer = strip_markdown(ans)
+            delta_ans = answer[len(last_ans):]
             
             # 🚀 INTELLIGENT STREAMING: Flush on phrase/sentence boundaries
             if not should_flush(delta_ans):
@@ -1201,6 +1248,8 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         yield decorate_answer(thought + answer)
     else:
         answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
+        # Strip markdown from final answer
+        answer = strip_markdown(answer)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
