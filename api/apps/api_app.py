@@ -26,7 +26,7 @@ from api.db import VALID_FILE_TYPES, FileType
 from api.db.db_models import APIToken, Task, File
 from api.db.services import duplicate_name
 from api.db.services.api_service import APITokenService, API4ConversationService
-from api.db.services.dialog_service import DialogService, chat
+from api.db.services.dialog_service import DialogService, chat, chatv1
 from api.db.services.document_service import DocumentService, doc_upload_and_parse
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
@@ -318,7 +318,7 @@ def completion():
         def stream():
             nonlocal dia, msg, req, conv, conversation_id
             try:
-                for ans in chat(dia, msg, True, **req):
+                for ans in chatv1(dia, msg, True, **req):
                     fillin_conv(ans)
                     rename_field(ans)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},

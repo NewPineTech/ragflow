@@ -769,26 +769,440 @@ def chat(dialog, messages, stream=True, **kwargs):
     if stream:
         last_ans = ""
         answer = ""
+        
+        
+        
         for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
             answer = ans
             delta_ans = ans[len(last_ans):]
-            if num_tokens_from_string(delta_ans) < 16:
+            
+            if len(delta_ans) < 16:
                 continue
+            
             last_ans = answer
             # Append to initial answer for streaming
             combined_answer = initial_answer +  thought + answer if initial_answer else thought + answer
-            yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+            # Skip TTS during streaming to avoid blocking
+            yield {"answer": combined_answer, "reference": {}, "audio_binary": None}
+        
+        # Final chunk: Flush remaining text
         delta_ans = answer[len(last_ans) :]
         if delta_ans:
             combined_answer = initial_answer +  thought + answer if initial_answer else thought + answer
-            yield {"answer": combined_answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+            yield {"answer": combined_answer, "reference": {}, "audio_binary": None}
         yield decorate_answer(thought + answer)
     else:
         answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
+        res = decorate_answer(answer)
+        res["audio_binary"] = tts(tts_mdl, answer)
+        yield res
+
+
+def chatv1(dialog, messages, stream=True, **kwargs):
+    """
+    Optimized chat function with intelligent streaming (V1)
+    
+    Improvements over chat():
+    1. ✅ Intelligent streaming with phrase/sentence boundaries
+    2. ✅ Word boundary detection (no mid-word cuts for Vietnamese)
+    3. ✅ Memory optimization (only last message when memory exists)
+    4. ✅ No TTS blocking during streaming
+    5. ✅ Early flush for instant feedback
+    
+    Args:
+        dialog: Dialog object with config
+        messages: List of conversation messages
+        stream: Enable streaming (default: True)
+        **kwargs: Additional parameters including:
+            - short_memory: Memory text from Redis
+            - doc_ids: Document filter
+            - quote: Enable citations
+            
+    Yields:
+        dict: Response chunks with answer, reference, audio_binary
+    """
+    assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
+
+    current_message = messages[-1]["content"]
+    classify = [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
+    logging.info(f"[CHATV1] Question classified as: {classify}")
+    
+    if (classify == "GREET" or classify == "SENSITIVE") or (not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
+        logging.info("[CHATV1] Using solo chat (no KB required)")
+        for ans in chat_solo(dialog, messages, stream):
+            yield ans
+        return
+
+    chat_start_ts = timer()
+
+    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+        llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+    else:
+        llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+
+    max_tokens = llm_model_config.get("max_tokens", 8192)
+    check_llm_ts = timer()
+   
+    langfuse_tracer = None
+    trace_context = {}
+    langfuse_keys = TenantLangfuseService.filter_by_tenant(tenant_id=dialog.tenant_id)
+    if langfuse_keys:
+        langfuse = Langfuse(public_key=langfuse_keys.public_key, secret_key=langfuse_keys.secret_key, host=langfuse_keys.host)
+        if langfuse.auth_check():
+            langfuse_tracer = langfuse
+            trace_id = langfuse_tracer.create_trace_id()
+            trace_context = {"trace_id": trace_id}
+
+    check_langfuse_tracer_ts = timer()
+    kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl = get_models(dialog)
+    toolcall_session, tools = kwargs.get("toolcall_session"), kwargs.get("tools")
+    if toolcall_session and tools:
+        chat_mdl.bind_tools(toolcall_session, tools)
+    bind_models_ts = timer()
+
+    retriever = settings.retriever
+    questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
+    attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
+    if "doc_ids" in messages[-1]:
+        attachments = messages[-1]["doc_ids"]
+
+    prompt_config = dialog.prompt_config
+    field_map = KnowledgebaseService.get_field_map(dialog.kb_ids)
+    
+    # Try SQL retrieval if field mapping exists
+    if field_map:
+        logging.debug("[CHATV1] Attempting SQL retrieval: {}".format(questions[-1]))
+        ans = use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
+        if ans:
+            yield ans
+            return
+
+    for p in prompt_config["parameters"]:
+        if p["key"] == "knowledge":
+            continue
+        if p["key"] not in kwargs and not p["optional"]:
+            raise KeyError("Miss parameter: " + p["key"])
+        if p["key"] not in kwargs:
+            prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
+    
+    # Extract memory from kwargs (loaded from Redis)
+    memory_text = kwargs.pop("short_memory", None)
+  
+    if len(questions) > 1 and prompt_config.get("refine_multiturn"):
+        questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
+    else:
+        questions = questions[-1:]
+
+    logging.info("[CHATV1] Questions: {}, Memory: {}".format(" ".join(questions), "Yes" if memory_text else "No"))
+   
+    if prompt_config.get("cross_languages"):
+        questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
+
+    if dialog.meta_data_filter:
+        metas = DocumentService.get_meta_by_kbs(dialog.kb_ids)
+        if dialog.meta_data_filter.get("method") == "auto":
+            filters = gen_meta_filter(chat_mdl, metas, questions[-1])
+            attachments.extend(meta_filter(metas, filters))
+            if not attachments:
+                attachments = None
+        elif dialog.meta_data_filter.get("method") == "manual":
+            attachments.extend(meta_filter(metas, dialog.meta_data_filter["manual"]))
+            if not attachments:
+                attachments = None
+
+    if prompt_config.get("keyword", False):
+        questions[-1] += keyword_extraction(chat_mdl, questions[-1])
+
+    refine_question_ts = timer()
+
+    thought = ""
+    kbinfos = {"total": 0, "chunks": [], "doc_aggs": []}
+    knowledges = []
+
+    if attachments is not None and "knowledge" in [p["key"] for p in prompt_config["parameters"]]:
+        tenant_ids = list(set([kb.tenant_id for kb in kbs]))
+        knowledges = []
+        
+        if prompt_config.get("reasoning", False):
+            reasoner = DeepResearcher(
+                chat_mdl,
+                prompt_config,
+                partial(
+                    retriever.retrieval,
+                    embd_mdl=embd_mdl,
+                    tenant_ids=tenant_ids,
+                    kb_ids=dialog.kb_ids,
+                    page=1,
+                    page_size=dialog.top_n,
+                    similarity_threshold=0.2,
+                    vector_similarity_weight=0.3,
+                    doc_ids=attachments,
+                ),
+            )
+
+            for think in reasoner.thinking(kbinfos, " ".join(questions)):
+                if isinstance(think, str):
+                    thought = think
+                    knowledges = [t for t in think.split("\n") if t]
+                elif stream:
+                    yield think
+        else:
+            if embd_mdl:
+                kbinfos = retriever.retrieval(
+                    " ".join(questions),
+                    embd_mdl,
+                    tenant_ids,
+                    dialog.kb_ids,
+                    1,
+                    dialog.top_n,
+                    dialog.similarity_threshold,
+                    dialog.vector_similarity_weight,
+                    doc_ids=attachments,
+                    top=dialog.top_k,
+                    aggs=False,
+                    rerank_mdl=rerank_mdl,
+                    rank_feature=label_question(" ".join(questions), kbs),
+                )
+                if prompt_config.get("toc_enhance"):
+                    cks = retriever.retrieval_by_toc(" ".join(questions), kbinfos["chunks"], tenant_ids, chat_mdl, dialog.top_n)
+                    if cks:
+                        kbinfos["chunks"] = cks
+                        
+            if prompt_config.get("tavily_api_key"):
+                tav = Tavily(prompt_config["tavily_api_key"])
+                tav_res = tav.retrieve_chunks(" ".join(questions))
+                kbinfos["chunks"].extend(tav_res["chunks"])
+                kbinfos["doc_aggs"].extend(tav_res["doc_aggs"])
+                
+            if prompt_config.get("use_kg"):
+                ck = settings.kg_retriever.retrieval(" ".join(questions), tenant_ids, dialog.kb_ids, embd_mdl,
+                                                       LLMBundle(dialog.tenant_id, LLMType.CHAT))
+                if ck["content_with_weight"]:
+                    kbinfos["chunks"].insert(0, ck)
+
+            knowledges = kb_prompt(kbinfos, max_tokens)
+
+    logging.debug("[CHATV1] Retrieved {} knowledge chunks".format(len(knowledges)))
+
+    retrieval_ts = timer()
+    
+    if not knowledges and prompt_config.get("empty_response"):
+        empty_res = prompt_config["empty_response"]
+        yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions),
+               "audio_binary": tts(tts_mdl, empty_res)}
+        return
+
+    kwargs["knowledge"] = ""
+    datetime_info = get_current_datetime_info()
+    gen_conf = dialog.llm_setting
+
+    try:
+        system_content = prompt_config["system"].format(**kwargs)
+    except KeyError as e:
+        logging.warning(f"[CHATV1] Missing parameter in system prompt: {e}")
+        system_content = prompt_config["system"]
+    
+    # Build system prompt with datetime and memory
+    system_content = f"{system_content}\n## Context:{datetime_info}"
+    msg = [{"role": "system", "content": system_content}]
+    
+    if memory_text:
+        msg.extend([{"role": "system", "content": f"##Memory: {memory_text}"}])
+        logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
+   
+    if knowledges:
+        kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
+        msg.extend([{"role": "system", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+
+    prompt4citation = ""
+    if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
+        prompt4citation = citation_prompt()
+    
+    # 🎯 MEMORY OPTIMIZATION: Only send last message if memory exists
+    if memory_text:
+        logging.info("[CHATV1] Using memory - sending only last user message")
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
+                    for m in messages[-1:] if m["role"] != "system"])
+    else:
+        logging.info("[CHATV1] No memory - sending full conversation history")
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
+                    for m in messages if m["role"] != "system"])
+    
+    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
+    assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
+    prompt = msg[0]["content"]
+
+    if "max_tokens" in gen_conf:
+        gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
+
+    def decorate_answer(answer):
+        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer
+
+        refs = []
+        ans = answer.split("</think>")
+        think = ""
+        if len(ans) == 2:
+            think = ans[0] + "</think>"
+            answer = ans[1]
+
+        if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
+            idx = set([])
+            if embd_mdl and not re.search(r"\[ID:([0-9]+)\]", answer):
+                answer, idx = retriever.insert_citations(
+                    answer,
+                    [ck["content_ltks"] for ck in kbinfos["chunks"]],
+                    [ck["vector"] for ck in kbinfos["chunks"]],
+                    embd_mdl,
+                    tkweight=1 - dialog.vector_similarity_weight,
+                    vtweight=dialog.vector_similarity_weight,
+                )
+            else:
+                for match in re.finditer(r"\[ID:([0-9]+)\]", answer):
+                    i = int(match.group(1))
+                    if i < len(kbinfos["chunks"]):
+                        idx.add(i)
+
+            answer, idx = repair_bad_citation_formats(answer, kbinfos, idx)
+
+            idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
+            recall_docs = [d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
+            if not recall_docs:
+                recall_docs = kbinfos["doc_aggs"]
+            kbinfos["doc_aggs"] = recall_docs
+
+        refs = deepcopy(kbinfos)
+        for c in refs["chunks"]:
+            if c.get("vector"):
+                del c["vector"]
+
+        if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
+            answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
+        
+        finish_chat_ts = timer()
+
+        total_time_cost = (finish_chat_ts - chat_start_ts) * 1000
+        check_llm_time_cost = (check_llm_ts - chat_start_ts) * 1000
+        check_langfuse_tracer_cost = (check_langfuse_tracer_ts - check_llm_ts) * 1000
+        bind_embedding_time_cost = (bind_models_ts - check_langfuse_tracer_ts) * 1000
+        refine_question_time_cost = (refine_question_ts - bind_models_ts) * 1000
+        retrieval_time_cost = (retrieval_ts - refine_question_ts) * 1000
+        generate_result_time_cost = (finish_chat_ts - retrieval_ts) * 1000
+
+        tk_num = num_tokens_from_string(think + answer)
+        prompt += "\n\n### Query:\n%s" % " ".join(questions)
+        prompt = (
+            f"{prompt}\n\n"
+            "## Time elapsed:\n"
+            f"  - Total: {total_time_cost:.1f}ms\n"
+            f"  - Check LLM: {check_llm_time_cost:.1f}ms\n"
+            f"  - Check Langfuse tracer: {check_langfuse_tracer_cost:.1f}ms\n"
+            f"  - Bind models: {bind_embedding_time_cost:.1f}ms\n"
+            f"  - Query refinement(LLM): {refine_question_time_cost:.1f}ms\n"
+            f"  - Retrieval: {retrieval_time_cost:.1f}ms\n"
+            f"  - Generate answer: {generate_result_time_cost:.1f}ms\n\n"
+            "## Token usage:\n"
+            f"  - Generated tokens(approximately): {tk_num}\n"
+            f"  - Token speed: {int(tk_num / (generate_result_time_cost / 1000.0))}/s"
+        )
+        logging.info(f"[CHATV1] {prompt}")
+        
+        if langfuse_tracer and "langfuse_generation" in locals():
+            langfuse_output = "\n" + re.sub(r"^.*?(### Query:.*)", r"\1", prompt, flags=re.DOTALL)
+            langfuse_output = {"time_elapsed:": re.sub(r"\n", "  \n", langfuse_output), "created_at": time.time()}
+            langfuse_generation.update(output=langfuse_output)
+            langfuse_generation.end()
+
+        return {"answer": think + answer, "reference": refs, "prompt": re.sub(r"\n", "  \n", prompt), "created_at": time.time()}
+
+    if langfuse_tracer:
+        langfuse_generation = langfuse_tracer.start_generation(
+            trace_context=trace_context, name="chatv1", model=llm_model_config["llm_name"],
+            input={"prompt": prompt, "prompt4citation": prompt4citation, "messages": msg}
+        )
+
+    if stream:
+        last_ans = ""
+        answer = ""
+        first_chunk_sent = False
+        
+        def should_flush(delta_text):
+            """
+            🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
+            
+            Priority:
+            1. First chunk: Complete word (3+ chars + space) - NO MID-WORD CUTS
+            2. Sentence boundaries: . ! ? ; (Vietnamese + English)
+            3. Phrase boundaries: , — : (natural pauses, min 10 chars)
+            4. Ellipsis patterns: ... (3+ dots)
+            5. Fallback: 50+ chars or 8+ tokens (safety net)
+            
+            Returns True if we should yield the current chunk.
+            """
+            nonlocal first_chunk_sent
+            
+            # 1. Early flush: Send first COMPLETE word immediately
+            # MUST end with space to avoid cutting Vietnamese words
+            # Example: "Phật " (OK), "Phật g" (BAD - cuts "giáo")
+            #          "Con mu" (BAD), "Con muốn " (OK)
+            if not first_chunk_sent and len(delta_text.strip()) > 0:
+                if delta_text.rstrip() != delta_text:  # Has trailing space
+                    words = delta_text.strip().split()
+                    if len(words) >= 1 and len(words[0]) >= 3:  # At least 1 meaningful word (3+ chars)
+                        first_chunk_sent = True
+                        return True
+            
+            # 2. Sentence boundaries (strongest signal)
+            # Vietnamese: . ! ? ; 。！？；
+            sentence_endings = re.search(r'[.!?;。！？；]\s*$', delta_text.strip())
+            if sentence_endings:
+                return True
+            
+            # 3. Phrase boundaries (medium signal)
+            # Vietnamese/English: , — : 、，：
+            phrase_endings = re.search(r'[,—:、，：]\s*$', delta_text.strip())
+            if phrase_endings and len(delta_text) >= 10:
+                return True
+            
+            # 4. Ellipsis patterns: ... (3+ dots)
+            if re.search(r'\.{3,}\s*$', delta_text.strip()):
+                return True
+            
+            # 5. Fallback: Length-based (avoid chunks too large)
+            if len(delta_text) >= 50:
+                return True
+            if num_tokens_from_string(delta_text) >= 8:
+                return True
+            
+            return False
+        
+        for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
+            if thought:
+                ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
+            answer = ans
+            delta_ans = ans[len(last_ans):]
+            
+            # 🚀 INTELLIGENT STREAMING: Flush on phrase/sentence boundaries
+            if not should_flush(delta_ans):
+                continue
+            
+            last_ans = answer
+            # No TTS during streaming to avoid blocking
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+        
+        # Final chunk: Flush remaining text
+        delta_ans = answer[len(last_ans):]
+        if delta_ans:
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+        
+        yield decorate_answer(thought + answer)
+    else:
+        answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
+        user_content = msg[-1].get("content", "[content not available]")
+        logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
         res["audio_binary"] = tts(tts_mdl, answer)
         yield res

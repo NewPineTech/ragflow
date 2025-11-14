@@ -60,7 +60,7 @@ def get_memory_from_redis(conversation_id: str) -> Optional[str]:
         return None
 
 
-def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 24) -> bool:
+def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 720) -> bool:
     """
     Save memory to Redis with expiration.
     
