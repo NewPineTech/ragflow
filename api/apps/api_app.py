@@ -51,6 +51,8 @@ from functools import partial
 from pathlib import Path
 from rag.utils.redis_conn import REDIS_CONN
 
+use_v1 = True
+chat_func = chatv1 if use_v1 else chat
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
 @login_required
@@ -318,7 +320,7 @@ def completion():
         def stream():
             nonlocal dia, msg, req, conv, conversation_id
             try:
-                for ans in chatv1(dia, msg, True, **req):
+                for ans in chat_func(dia, msg, True, **req):
                     fillin_conv(ans)
                     rename_field(ans)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
@@ -342,7 +344,7 @@ def completion():
             return resp
 
         answer = None
-        for ans in chat(dia, msg, **req):
+        for ans in chat_func(dia, msg, **req):
             answer = ans
             fillin_conv(ans)
             API4ConversationService.append_message(conv.id, conv.to_dict())

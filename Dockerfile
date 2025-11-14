@@ -152,6 +152,24 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
         uv sync --python 3.10 --all-extras; \
     fi
 
+# Install PyTorch (CPU version for lighter image, or CUDA version if GPU needed)
+# For CPU-only (recommended for most deployments):
+RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    if [ "$NEED_MIRROR" == "1" ]; then \
+        pip install torch torchvision torchaudio --index-url https://mirrors.tuna.tsinghua.edu.cn/pytorch-wheels/cpu; \
+    else \
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; \
+    fi
+# For CUDA 11.8 (uncomment if GPU support needed):
+# RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
+#     source ${VIRTUAL_ENV}/bin/activate && \
+#     if [ "$NEED_MIRROR" == "1" ]; then \
+#         pip install torch torchvision torchaudio --index-url https://mirrors.tuna.tsinghua.edu.cn/pytorch-wheels/cu118; \
+#     else \
+#         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118; \
+#     fi
+
 COPY web web
 COPY docs docs
 RUN --mount=type=cache,id=ragflow_npm,target=/root/.npm,sharing=locked \
