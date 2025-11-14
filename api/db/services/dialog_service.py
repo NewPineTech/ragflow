@@ -937,18 +937,26 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
 
-    # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
-    # Returns immediately if KB not needed, otherwise proceeds with retrieval
-    result = classify_and_respond(dialog, messages, stream)
+    # # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
+    # # Returns immediately if KB not needed, otherwise proceeds with retrieval
+    # result = classify_and_respond(dialog, messages, stream)
     
-    # Check if it's a simple classify result (KB needed)
-    if isinstance(result, tuple) and result[0] == "KB":
-        logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
-        # Continue with normal KB flow below
-    else:
-        # GREET or SENSITIVE - response already generated, yield and return
-        logging.info(f"[CHATV1] Non-KB question - response generated in classify_and_respond")
-        for ans in result:
+    # # Check if it's a simple classify result (KB needed)
+    # if isinstance(result, tuple) and result[0] == "KB":
+    #     logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
+    #     # Continue with normal KB flow below
+    # else:
+    #     # GREET or SENSITIVE - response already generated, yield and return
+    #     logging.info(f"[CHATV1] Non-KB question - response generated in classify_and_respond")
+    #     for ans in result:
+    #         yield ans
+    #     return
+    current_message=messages[-1]["content"]
+    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
+    print("Classify:", classify) #Classify: ['GREET']
+    if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
+        print("Use solo chat for greeting or sensitive question or no knowledge base.")
+        for ans in chat_solo(dialog, messages, stream):
             yield ans
         return
     
