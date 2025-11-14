@@ -1235,8 +1235,8 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             answer = ans
             delta_ans = answer[len(last_ans):]
             
-            # 🚀 INTELLIGENT STREAMING: Flush on phrase/sentence boundaries
-            if not should_flush(delta_ans):
+            # 🚀 INTELLIGENT STREAMING: Check full answer for boundaries (not just delta)
+            if not should_flush(answer):
                 continue
             
             last_ans = answer
