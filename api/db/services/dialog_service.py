@@ -828,7 +828,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         dict: Response chunks with answer, reference, audio_binary
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
-
+    
     current_message = messages[-1]["content"]
     classify = [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
     logging.info(f"[CHATV1] Question classified as: {classify}")
