@@ -402,17 +402,18 @@ def chat_solo(dialog, messages, stream=True):
             # No TTS during streaming to avoid blocking
             yield {"answer":  answer, "reference": {}, "audio_binary": None}
         
-        # Final chunk: Flush remaining text
+        # Final chunk: Flush remaining text with TTS
         delta_ans = answer[len(last_ans):]
         if delta_ans:
-            yield {"answer":  answer, "reference": {}, "audio_binary": None}
-        
-        yield  answer
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+        else:
+            # Ensure we always send final response with proper format
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer)}
     else:
         answer = chat_mdl.chat(system_prompt+"\n"+system_content , msg[1:], {})
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
-        yield {"answer":  answer, "reference": {}, "audio_binary":  tts(tts_mdl, answer)}
+        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer)}
 
 
 def chat_solo_simple(dialog, last_message, stream=True):
