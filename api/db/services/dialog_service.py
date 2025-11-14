@@ -640,17 +640,19 @@ def chat(dialog, messages, stream=True, **kwargs):
         logging.warning(f"Missing parameter in system prompt: {e}")
         system_content = prompt_config["system"]
     
-    # Format system prompt với thông tin ngày giờ
-    # Thêm datetime info và memory vào system prompt
-    system_content = f"{system_content}\n## Context:{datetime_info}"
-    msg = [{"role": "system", "content": system_content}]
+    # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
+    system_parts = [system_content, f"\n## Context:{datetime_info}"]
+    
     if memory_text:
-        msg.extend([{"role": "system", "content": f"##Memory: {memory_text}"}])
+        system_parts.append(f"\n##Memory: {memory_text}")
         logging.info(f"Memory added to message: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        msg.extend([{"role": "system", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+        system_parts.append(f"\n## Knowledge Context: {kwargs['knowledge']}")
+    
+    # Single system message for better LLM compatibility
+    msg = [{"role": "system", "content": "".join(system_parts)}]
 
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
@@ -1006,17 +1008,19 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         logging.warning(f"[CHATV1] Missing parameter in system prompt: {e}")
         system_content = prompt_config["system"]
     
-    # Build system prompt with datetime and memory
-    system_content = f"{system_content}\n## Context:{datetime_info}"
-    msg = [{"role": "system", "content": system_content}]
+    # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
+    system_parts = [system_content, f"\n## Context:{datetime_info}"]
     
     if memory_text:
-        msg.extend([{"role": "system", "content": f"##Memory: {memory_text}"}])
+        system_parts.append(f"\n##Memory: {memory_text}")
         logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        msg.extend([{"role": "system", "content": f"## Knowledge Context: {kwargs['knowledge']}"}])
+        system_parts.append(f"\n## Knowledge Context: {kwargs['knowledge']}")
+    
+    # Single system message for better LLM compatibility
+    msg = [{"role": "system", "content": "".join(system_parts)}]
 
     def strip_markdown(text):
         """
