@@ -351,22 +351,31 @@ def chat_solo(dialog, messages, stream=True):
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     if stream:
         last_ans = ""
-        delta_ans = ""
-        for ans in chat_mdl.chat_streamly(system_content, msg, dialog.llm_setting):
+        answer = ""
+        
+        for ans in chat_mdl.chat_streamly(system_prompt+"\n"+system_content , msg[1:], {}):
             answer = ans
-            delta_ans = ans[len(last_ans):]
-            if num_tokens_from_string(delta_ans) < 16:
+            delta_ans = answer[len(last_ans):]
+            
+            # 🚀 INTELLIGENT STREAMING: Check full answer for boundaries (not just delta)
+            if not should_flush(answer):
                 continue
+            
             last_ans = answer
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
-            delta_ans = ""
+            # No TTS during streaming to avoid blocking
+            yield {"answer":  answer, "reference": {}, "audio_binary": None}
+        
+        # Final chunk: Flush remaining text
+        delta_ans = answer[len(last_ans):]
         if delta_ans:
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+            yield {"answer":  answer, "reference": {}, "audio_binary": None}
+        
+        yield  answer
     else:
-        answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
+        answer = chat_mdl.chat(system_prompt+"\n"+system_content , msg[1:], {})
         user_content = msg[-1].get("content", "[content not available]")
-        logging.debug("User: {}|Assistant: {}".format(user_content, answer))
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+        logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
+        yield {"answer":  answer, "reference": {}, "audio_binary":  tts(tts_mdl, answer)}
 
 
 def chat_solo_simple(dialog, last_message, stream=True):
@@ -911,6 +920,100 @@ def chat(dialog, messages, stream=True, **kwargs):
         res["audio_binary"] = tts(tts_mdl, answer)
         yield res
 
+def strip_markdown(text):
+        """
+        Remove markdown formatting while preserving citations [ID:n].
+        Strips: **bold**, *italic*, __underline__, ~~strikethrough~~, #headers, etc.
+        """
+        # Preserve citations by replacing temporarily
+        citation_placeholder = {}
+        citation_pattern = r'\[ID:\d+\]'
+        for i, match in enumerate(re.finditer(citation_pattern, text)):
+            placeholder = f"__CITATION_{i}__"
+            citation_placeholder[placeholder] = match.group(0)
+            text = text.replace(match.group(0), placeholder, 1)
+        
+        # Remove markdown formatting
+        # Headers (##, ###, etc.)
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        # Bold (**text** or __text__)
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+        # Italic (*text* or _text_)
+        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
+        # Strikethrough (~~text~~)
+        text = re.sub(r'~~(.+?)~~', r'\1', text)
+        # Code blocks (```code```)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        # Inline code (`code`)
+        text = re.sub(r'`(.+?)`', r'\1', text)
+        # Links ([text](url))
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        # Images (![alt](url))
+        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
+        # Blockquotes (> text)
+        text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+        # Horizontal rules (---, ***, ___)
+        text = re.sub(r'^[-*_]{3,}$', '', text, flags=re.MULTILINE)
+        # Lists (- item, * item, 1. item)
+        text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
+        
+        # Restore citations
+        for placeholder, citation in citation_placeholder.items():
+            text = text.replace(placeholder, citation)
+        
+        return text
+
+def should_flush(delta_text):
+            first_chunk_sent = False
+
+            """
+            🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
+            
+            Priority:
+            1. First chunk: Complete word (3+ chars + space) - NO MID-WORD CUTS
+            2. Sentence boundaries: . ! ? ; (Vietnamese + English)
+            3. Phrase boundaries: , — : (natural pauses, min 10 chars)
+            4. Ellipsis patterns: ... (3+ dots)
+            5. Fallback: 50+ chars or 8+ tokens (safety net)
+            
+            Returns True if we should yield the current chunk.
+            """
+            nonlocal first_chunk_sent
+            
+            # 1. Early flush: Send first COMPLETE word immediately
+            # For first chunk: Flush when we have 3+ chars (even without trailing space)
+            # This gives faster first token experience
+            # Example: "Thầy" (3 chars, OK), "Th" (2 chars, wait), "Phật giáo" (OK)
+            if not first_chunk_sent and len(delta_text.strip()) >= 3:
+                first_chunk_sent = True
+                return True
+            
+            # 2. Sentence boundaries (strongest signal)
+            # Vietnamese: . ! ? ; 。！？；
+            sentence_endings = re.search(r'[.!?;。！？；]\s*$', delta_text.strip())
+            if sentence_endings:
+                return True
+            
+            # 3. Phrase boundaries (medium signal)
+            # Vietnamese/English: , — : 、，：
+            phrase_endings = re.search(r'[,—:、，：]\s*$', delta_text.strip())
+            if phrase_endings and len(delta_text) >= 10:
+                return True
+            
+            # 4. Ellipsis patterns: ... (3+ dots)
+            if re.search(r'\.{3,}\s*$', delta_text.strip()):
+                return True
+            
+            # 5. Fallback: Length-based (avoid chunks too large)
+            if len(delta_text) >= 50:
+                return True
+            if num_tokens_from_string(delta_text) >= 8:
+                return True
+            
+            return False
 
 def chatv1(dialog, messages, stream=True, **kwargs):
     """
@@ -1150,51 +1253,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     # Single system message for better LLM compatibility
     msg = [{"role": "system", "content": "".join(system_parts)}]
 
-    def strip_markdown(text):
-        """
-        Remove markdown formatting while preserving citations [ID:n].
-        Strips: **bold**, *italic*, __underline__, ~~strikethrough~~, #headers, etc.
-        """
-        # Preserve citations by replacing temporarily
-        citation_placeholder = {}
-        citation_pattern = r'\[ID:\d+\]'
-        for i, match in enumerate(re.finditer(citation_pattern, text)):
-            placeholder = f"__CITATION_{i}__"
-            citation_placeholder[placeholder] = match.group(0)
-            text = text.replace(match.group(0), placeholder, 1)
-        
-        # Remove markdown formatting
-        # Headers (##, ###, etc.)
-        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-        # Bold (**text** or __text__)
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-        text = re.sub(r'__(.+?)__', r'\1', text)
-        # Italic (*text* or _text_)
-        text = re.sub(r'\*(.+?)\*', r'\1', text)
-        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
-        # Strikethrough (~~text~~)
-        text = re.sub(r'~~(.+?)~~', r'\1', text)
-        # Code blocks (```code```)
-        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-        # Inline code (`code`)
-        text = re.sub(r'`(.+?)`', r'\1', text)
-        # Links ([text](url))
-        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-        # Images (![alt](url))
-        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
-        # Blockquotes (> text)
-        text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
-        # Horizontal rules (---, ***, ___)
-        text = re.sub(r'^[-*_]{3,}$', '', text, flags=re.MULTILINE)
-        # Lists (- item, * item, 1. item)
-        text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
-        text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
-        
-        # Restore citations
-        for placeholder, citation in citation_placeholder.items():
-            text = text.replace(placeholder, citation)
-        
-        return text
+    
 
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
@@ -1308,54 +1367,6 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     if stream:
         last_ans = ""
         answer = ""
-        first_chunk_sent = False
-        
-        def should_flush(delta_text):
-            """
-            🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
-            
-            Priority:
-            1. First chunk: Complete word (3+ chars + space) - NO MID-WORD CUTS
-            2. Sentence boundaries: . ! ? ; (Vietnamese + English)
-            3. Phrase boundaries: , — : (natural pauses, min 10 chars)
-            4. Ellipsis patterns: ... (3+ dots)
-            5. Fallback: 50+ chars or 8+ tokens (safety net)
-            
-            Returns True if we should yield the current chunk.
-            """
-            nonlocal first_chunk_sent
-            
-            # 1. Early flush: Send first COMPLETE word immediately
-            # For first chunk: Flush when we have 3+ chars (even without trailing space)
-            # This gives faster first token experience
-            # Example: "Thầy" (3 chars, OK), "Th" (2 chars, wait), "Phật giáo" (OK)
-            if not first_chunk_sent and len(delta_text.strip()) >= 3:
-                first_chunk_sent = True
-                return True
-            
-            # 2. Sentence boundaries (strongest signal)
-            # Vietnamese: . ! ? ; 。！？；
-            sentence_endings = re.search(r'[.!?;。！？；]\s*$', delta_text.strip())
-            if sentence_endings:
-                return True
-            
-            # 3. Phrase boundaries (medium signal)
-            # Vietnamese/English: , — : 、，：
-            phrase_endings = re.search(r'[,—:、，：]\s*$', delta_text.strip())
-            if phrase_endings and len(delta_text) >= 10:
-                return True
-            
-            # 4. Ellipsis patterns: ... (3+ dots)
-            if re.search(r'\.{3,}\s*$', delta_text.strip()):
-                return True
-            
-            # 5. Fallback: Length-based (avoid chunks too large)
-            if len(delta_text) >= 50:
-                return True
-            if num_tokens_from_string(delta_text) >= 8:
-                return True
-            
-            return False
         
         for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
