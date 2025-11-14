@@ -155,7 +155,7 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
 # Install PyTorch (CPU version for lighter image, or CUDA version if GPU needed)
 # For CPU-only (recommended for most deployments):
 RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
-    source ${VIRTUAL_ENV}/bin/activate && \
+    source .venv/bin/activate && \
     if [ "$NEED_MIRROR" == "1" ]; then \
         pip install torch torchvision torchaudio --index-url https://mirrors.tuna.tsinghua.edu.cn/pytorch-wheels/cpu; \
     else \
@@ -163,7 +163,7 @@ RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
     fi
 # For CUDA 11.8 (uncomment if GPU support needed):
 # RUN --mount=type=cache,id=ragflow_pip,target=/root/.cache/pip,sharing=locked \
-#     source ${VIRTUAL_ENV}/bin/activate && \
+#     source .venv/bin/activate && \
 #     if [ "$NEED_MIRROR" == "1" ]; then \
 #         pip install torch torchvision torchaudio --index-url https://mirrors.tuna.tsinghua.edu.cn/pytorch-wheels/cu118; \
 #     else \
