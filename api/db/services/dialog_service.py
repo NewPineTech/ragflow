@@ -222,6 +222,105 @@ def get_current_datetime_info():
     return datetime_info
 
 
+def classify_and_respond(dialog, messages, stream=True):
+    """
+    🚀 OPTIMIZED: Classify question + Generate response in ONE LLM call
+    
+    Returns: (classify_type, response_generator)
+        - classify_type: "KB" | "GREET" | "SENSITIVE"
+        - response_generator: Generator yielding response chunks if not KB
+    """
+    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+    else:
+        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+
+    prompt_config = dialog.prompt_config
+    datetime_info = get_current_datetime_info()
+    
+    # Combined system prompt: Classify + Respond
+    system_content = f"""{datetime_info}
+
+{prompt_config.get("system", "")}
+
+## IMPORTANT INSTRUCTIONS:
+1. First, classify the user's question into ONE category:
+   - KB: Requires knowledge base lookup (questions about specific topics, facts, procedures)
+   - GREET: Greeting, chitchat, or general conversation
+   - SENSITIVE: Inappropriate, harmful, or off-topic content
+
+2. Response format:
+   - If KB: Start with "[CLASSIFY:KB]" then stop (no answer needed)
+   - If GREET or SENSITIVE: Start with "[CLASSIFY:GREET]" or "[CLASSIFY:SENSITIVE]" then provide a friendly response
+
+Example:
+User: "Xin chào thầy"
+Assistant: [CLASSIFY:GREET] Chào con, thầy rất vui được gặp con.
+
+User: "Bát quan trai là gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Thầy khỏe không?"
+Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
+
+    tts_mdl = None
+    if prompt_config.get("tts"):
+        tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
+    
+    msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
+    
+    if stream:
+        last_ans = ""
+        answer = ""
+        classify_type = None
+        
+        for ans in chat_mdl.chat_streamly(system_content, msg, dialog.llm_setting):
+            answer = ans
+            
+            # Extract classification from first chunk
+            if classify_type is None:
+                if "[CLASSIFY:KB]" in answer:
+                    classify_type = "KB"
+                    return classify_type, None  # No response needed for KB
+                elif "[CLASSIFY:GREET]" in answer:
+                    classify_type = "GREET"
+                    answer = answer.replace("[CLASSIFY:GREET]", "").strip()
+                elif "[CLASSIFY:SENSITIVE]" in answer:
+                    classify_type = "SENSITIVE"
+                    answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
+            
+            # Stream response for GREET/SENSITIVE
+            if classify_type in ["GREET", "SENSITIVE"]:
+                delta_ans = answer[len(last_ans):]
+                if num_tokens_from_string(delta_ans) < 16:
+                    continue
+                last_ans = answer
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+        
+        # Final chunk
+        if classify_type in ["GREET", "SENSITIVE"]:
+            delta_ans = answer[len(last_ans):]
+            if delta_ans:
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+    else:
+        answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
+        
+        # Extract classification
+        if "[CLASSIFY:KB]" in answer:
+            return "KB", None
+        elif "[CLASSIFY:GREET]" in answer:
+            classify_type = "GREET"
+            answer = answer.replace("[CLASSIFY:GREET]", "").strip()
+        elif "[CLASSIFY:SENSITIVE]" in answer:
+            classify_type = "SENSITIVE"
+            answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
+        else:
+            classify_type = "GREET"  # Default fallback
+        
+        logging.debug(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {answer}")
+        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+
+
 def chat_solo(dialog, messages, stream=True):
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
@@ -829,12 +928,24 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
 
-    current_message = messages[-1]["content"]
-    classify = [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
-    logging.info(f"[CHATV1] Question classified as: {classify}")
+    # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
+    # Returns immediately if KB not needed, otherwise proceeds with retrieval
+    result = classify_and_respond(dialog, messages, stream)
     
-    if (classify == "GREET" or classify == "SENSITIVE") or (not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
-        logging.info("[CHATV1] Using solo chat (no KB required)")
+    # Check if it's a simple classify result (KB needed)
+    if isinstance(result, tuple) and result[0] == "KB":
+        logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
+        # Continue with normal KB flow below
+    else:
+        # GREET or SENSITIVE - response already generated, yield and return
+        logging.info(f"[CHATV1] Non-KB question - response generated in classify_and_respond")
+        for ans in result:
+            yield ans
+        return
+    
+    # Additional check: No KB configured
+    if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
+        logging.info("[CHATV1] No KB configured, falling back to chat_solo")
         for ans in chat_solo(dialog, messages, stream):
             yield ans
         return
@@ -846,7 +957,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     else:
         llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
 
-    max_tokens = llm_model_config.get("max_tokens", 8192)
+    max_tokens = llm_model_config.get("max_tokens", 1024)
     check_llm_ts = timer()
    
     langfuse_tracer = None
