@@ -162,7 +162,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
 
     if stream:
         try:
-            for ans in chat(dia, msg, True, **kwargs):
+            for ans in chat_func(dia, msg, True, **kwargs):
                 ans = structure_answer(conv, ans, message_id, session_id)
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
             ConversationService.update_by_id(conv.id, conv.to_dict())
@@ -180,7 +180,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
 
     else:
         answer = None
-        for ans in chat(dia, msg, False, **kwargs):
+        for ans in chat_func(dia, msg, False, **kwargs):
             answer = structure_answer(conv, ans, message_id, session_id)
             ConversationService.update_by_id(conv.id, conv.to_dict())
             break
@@ -248,7 +248,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
 
     if stream:
         try:
-            for ans in chat(dia, msg, True, **kwargs):
+            for ans in  chat_func(dia, msg, True, **kwargs):
                 ans = structure_answer(conv, ans, message_id, session_id)
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                            ensure_ascii=False) + "\n\n"
@@ -261,7 +261,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
 
     else:
         answer = None
-        for ans in chat(dia, msg, False, **kwargs):
+        for ans in chat_func(dia, msg, False, **kwargs):
             answer = structure_answer(conv, ans, message_id, session_id)
             API4ConversationService.append_message(conv.id, conv.to_dict())
             break
