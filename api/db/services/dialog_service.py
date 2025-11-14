@@ -222,6 +222,43 @@ def get_current_datetime_info():
     return datetime_info
 
 
+def should_flush(full_text):
+    """
+    🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
+    
+    Priority:
+    1. Sentence boundaries: . ! ? ; (Vietnamese + English)
+    2. Phrase boundaries: , — : (natural pauses, min 10 chars)
+    3. Ellipsis patterns: ... (3+ dots)
+    4. Fallback: 50+ chars or 8+ tokens (safety net)
+    
+    Returns True if we should yield the current chunk.
+    """
+    # 1. Sentence boundaries (strongest signal)
+    # Vietnamese: . ! ? ; 。！？；
+    sentence_endings = re.search(r'[.!?;。！？；]\s*$', full_text.strip())
+    if sentence_endings:
+        return True
+    
+    # 2. Phrase boundaries (medium signal)
+    # Vietnamese/English: , — : 、，：
+    phrase_endings = re.search(r'[,—:、，：]\s*$', full_text.strip())
+    if phrase_endings and len(full_text) >= 10:
+        return True
+    
+    # 3. Ellipsis patterns: ... (3+ dots)
+    if re.search(r'\.{3,}\s*$', full_text.strip()):
+        return True
+    
+    # 4. Fallback: Length-based (avoid chunks too large)
+    if len(full_text) >= 50:
+        return True
+    if num_tokens_from_string(full_text) >= 8:
+        return True
+    
+    return False
+
+
 def classify_and_respond(dialog, messages, stream=True):
     """
     🚀 OPTIMIZED: Classify question + Generate response in ONE LLM call
@@ -889,8 +926,6 @@ def chat(dialog, messages, stream=True, **kwargs):
         last_ans = ""
         answer = ""
         
-        
-        
         for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
@@ -966,54 +1001,6 @@ def strip_markdown(text):
         
         return text
 
-def should_flush(delta_text):
-            first_chunk_sent = False
-
-            """
-            🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
-            
-            Priority:
-            1. First chunk: Complete word (3+ chars + space) - NO MID-WORD CUTS
-            2. Sentence boundaries: . ! ? ; (Vietnamese + English)
-            3. Phrase boundaries: , — : (natural pauses, min 10 chars)
-            4. Ellipsis patterns: ... (3+ dots)
-            5. Fallback: 50+ chars or 8+ tokens (safety net)
-            
-            Returns True if we should yield the current chunk.
-            """
-            nonlocal first_chunk_sent
-            
-            # 1. Early flush: Send first COMPLETE word immediately
-            # For first chunk: Flush when we have 3+ chars (even without trailing space)
-            # This gives faster first token experience
-            # Example: "Thầy" (3 chars, OK), "Th" (2 chars, wait), "Phật giáo" (OK)
-            if not first_chunk_sent and len(delta_text.strip()) >= 3:
-                first_chunk_sent = True
-                return True
-            
-            # 2. Sentence boundaries (strongest signal)
-            # Vietnamese: . ! ? ; 。！？；
-            sentence_endings = re.search(r'[.!?;。！？；]\s*$', delta_text.strip())
-            if sentence_endings:
-                return True
-            
-            # 3. Phrase boundaries (medium signal)
-            # Vietnamese/English: , — : 、，：
-            phrase_endings = re.search(r'[,—:、，：]\s*$', delta_text.strip())
-            if phrase_endings and len(delta_text) >= 10:
-                return True
-            
-            # 4. Ellipsis patterns: ... (3+ dots)
-            if re.search(r'\.{3,}\s*$', delta_text.strip()):
-                return True
-            
-            # 5. Fallback: Length-based (avoid chunks too large)
-            if len(delta_text) >= 50:
-                return True
-            if num_tokens_from_string(delta_text) >= 8:
-                return True
-            
-            return False
 
 def chatv1(dialog, messages, stream=True, **kwargs):
     """
