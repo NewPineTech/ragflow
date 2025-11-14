@@ -828,7 +828,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         dict: Response chunks with answer, reference, audio_binary
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
-    
+
     current_message = messages[-1]["content"]
     classify = [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
     logging.info(f"[CHATV1] Question classified as: {classify}")
@@ -1124,6 +1124,9 @@ def chatv1(dialog, messages, stream=True, **kwargs):
                 recall_docs = kbinfos["doc_aggs"]
             kbinfos["doc_aggs"] = recall_docs
 
+        # 🧹 Strip markdown AFTER citations are added (preserves [ID:n] format)
+        answer = strip_markdown(answer)
+
         refs = deepcopy(kbinfos)
         for c in refs["chunks"]:
             if c.get("vector"):
@@ -1195,15 +1198,12 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             nonlocal first_chunk_sent
             
             # 1. Early flush: Send first COMPLETE word immediately
-            # MUST end with space to avoid cutting Vietnamese words
-            # Example: "Phật " (OK), "Phật g" (BAD - cuts "giáo")
-            #          "Con mu" (BAD), "Con muốn " (OK)
-            if not first_chunk_sent and len(delta_text.strip()) > 0:
-                if delta_text.rstrip() != delta_text:  # Has trailing space
-                    words = delta_text.strip().split()
-                    if len(words) >= 1 and len(words[0]) >= 3:  # At least 1 meaningful word (3+ chars)
-                        first_chunk_sent = True
-                        return True
+            # For first chunk: Flush when we have 3+ chars (even without trailing space)
+            # This gives faster first token experience
+            # Example: "Thầy" (3 chars, OK), "Th" (2 chars, wait), "Phật giáo" (OK)
+            if not first_chunk_sent and len(delta_text.strip()) >= 3:
+                first_chunk_sent = True
+                return True
             
             # 2. Sentence boundaries (strongest signal)
             # Vietnamese: . ! ? ; 。！？；
@@ -1232,8 +1232,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
-            # Strip markdown from answer
-            answer = strip_markdown(ans)
+            answer = ans
             delta_ans = answer[len(last_ans):]
             
             # 🚀 INTELLIGENT STREAMING: Flush on phrase/sentence boundaries
@@ -1252,8 +1251,6 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         yield decorate_answer(thought + answer)
     else:
         answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
-        # Strip markdown from final answer
-        answer = strip_markdown(answer)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
