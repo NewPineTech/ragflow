@@ -222,48 +222,36 @@ def get_current_datetime_info():
     return datetime_info
 
 
-def should_flush(full_text):
+def should_flush(delta_text):
     """
-    🚀 INTELLIGENT STREAMING: Flush detection based on WORD boundaries
+    🚀 WORD-BY-WORD STREAMING: Flush after each complete word
     
-    Priority:
-    1. Complete word: Ends with space (word boundary)
-    2. Sentence boundaries: . ! ? ; (Vietnamese + English)
-    3. Phrase boundaries: , — : (natural pauses)
-    4. Ellipsis patterns: ... (3+ dots)
-    5. Fallback: 5+ words or 30+ chars (safety net)
+    Strategy:
+    - Flush when delta ends with space (complete word)
+    - Flush when delta ends with punctuation
+    - Minimal threshold: Just need any content
     
-    Returns True if we should yield the current chunk.
+    This ensures smooth word-by-word streaming without mid-word cuts.
     """
-    text = full_text.strip()
-    return True
-    # 1. Word boundary (PRIMARY): Flush after complete word (ends with space)
-    # This ensures we never cut mid-word for Vietnamese
-    if full_text.endswith(' ') and len(text) > 0:
+    if not delta_text:
+        return False
+    
+    # Strip to check actual content
+    text = delta_text.strip()
+    if not text:
+        return False
+    
+    # 1. Word boundary: Flush if ends with space (complete word)
+    if delta_text.endswith(' '):
         return True
     
-    # 2. Sentence boundaries (strongest signal)
-    # Vietnamese: . ! ? ; 。！？；
-    sentence_endings = re.search(r'[.!?;。！？；]\s*$', text)
-    if sentence_endings:
+    # 2. Punctuation: Flush if ends with any punctuation
+    if re.search(r'[.!?,;:。！？；、，：—]\s*$', delta_text):
         return True
     
-    # 3. Phrase boundaries (medium signal)
-    # Vietnamese/English: , — : 、，：
-    phrase_endings = re.search(r'[,—:、，：]\s*$', text)
-    if phrase_endings:
-        return True
-    
-    # 4. Ellipsis patterns: ... (3+ dots)
-    if re.search(r'\.{3,}\s*$', text):
-        return True
-    
-    # 5. Fallback: Count words to avoid too large chunks
+    # 3. Minimum threshold: Flush if we have at least 1 word (fallback)
     words = text.split()
-    if len(words) >= 3:  # Flush after 5 words max
-        return True
-    
-    if len(text) >= 15:  # Or 15 chars as absolute max
+    if len(words) >= 1:
         return True
     
     return False
@@ -402,6 +390,7 @@ def chat_solo(dialog, messages, stream=True):
         
         for ans in chat_mdl.chat_streamly(system_prompt+"\n"+system_content , msg[1:], {}):
             answer = ans
+            logging.info(f"[CHATV1 STREAM] Current answer {answer} length: {len(answer)}")
             delta_ans = answer[len(last_ans):]
             
             # 🚀 WORD-BY-WORD STREAMING: Check delta for word boundary (not accumulated answer)
