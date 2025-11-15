@@ -236,7 +236,7 @@ def should_flush(full_text):
     Returns True if we should yield the current chunk.
     """
     text = full_text.strip()
-    
+    return True
     # 1. Word boundary (PRIMARY): Flush after complete word (ends with space)
     # This ensures we never cut mid-word for Vietnamese
     if full_text.endswith(' ') and len(text) > 0:
