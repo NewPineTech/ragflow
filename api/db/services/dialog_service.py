@@ -224,36 +224,46 @@ def get_current_datetime_info():
 
 def should_flush(full_text):
     """
-    🚀 INTELLIGENT STREAMING: Flush detection based on natural language boundaries
+    🚀 INTELLIGENT STREAMING: Flush detection based on WORD boundaries
     
     Priority:
-    1. Sentence boundaries: . ! ? ; (Vietnamese + English)
-    2. Phrase boundaries: , — : (natural pauses, min 10 chars)
-    3. Ellipsis patterns: ... (3+ dots)
-    4. Fallback: 50+ chars or 8+ tokens (safety net)
+    1. Complete word: Ends with space (word boundary)
+    2. Sentence boundaries: . ! ? ; (Vietnamese + English)
+    3. Phrase boundaries: , — : (natural pauses)
+    4. Ellipsis patterns: ... (3+ dots)
+    5. Fallback: 5+ words or 30+ chars (safety net)
     
     Returns True if we should yield the current chunk.
     """
-    # 1. Sentence boundaries (strongest signal)
+    text = full_text.strip()
+    
+    # 1. Word boundary (PRIMARY): Flush after complete word (ends with space)
+    # This ensures we never cut mid-word for Vietnamese
+    if full_text.endswith(' ') and len(text) > 0:
+        return True
+    
+    # 2. Sentence boundaries (strongest signal)
     # Vietnamese: . ! ? ; 。！？；
-    sentence_endings = re.search(r'[.!?;。！？；]\s*$', full_text.strip())
+    sentence_endings = re.search(r'[.!?;。！？；]\s*$', text)
     if sentence_endings:
         return True
     
-    # 2. Phrase boundaries (medium signal)
+    # 3. Phrase boundaries (medium signal)
     # Vietnamese/English: , — : 、，：
-    phrase_endings = re.search(r'[,—:、，：]\s*$', full_text.strip())
-    if phrase_endings and len(full_text) >= 10:
+    phrase_endings = re.search(r'[,—:、，：]\s*$', text)
+    if phrase_endings:
         return True
     
-    # 3. Ellipsis patterns: ... (3+ dots)
-    if re.search(r'\.{3,}\s*$', full_text.strip()):
+    # 4. Ellipsis patterns: ... (3+ dots)
+    if re.search(r'\.{3,}\s*$', text):
         return True
     
-    # 4. Fallback: Length-based (avoid chunks too large)
-    if len(full_text) >= 50:
+    # 5. Fallback: Count words to avoid too large chunks
+    words = text.split()
+    if len(words) >= 3:  # Flush after 5 words max
         return True
-    if num_tokens_from_string(full_text) >= 8:
+    
+    if len(text) >= 15:  # Or 15 chars as absolute max
         return True
     
     return False
