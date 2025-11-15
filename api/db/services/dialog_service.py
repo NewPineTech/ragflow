@@ -404,8 +404,9 @@ def chat_solo(dialog, messages, stream=True):
             answer = ans
             delta_ans = answer[len(last_ans):]
             
-            # 🚀 INTELLIGENT STREAMING: Check full answer for boundaries (not just delta)
-            if not should_flush(answer):
+            # 🚀 WORD-BY-WORD STREAMING: Check delta for word boundary (not accumulated answer)
+            # Flush immediately after each complete word (ends with space)
+            if not should_flush(delta_ans):
                 continue
             
             last_ans = answer
