@@ -1270,9 +1270,14 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
                     for m in messages if m["role"] != "system"])
     
-    used_token_count, msg = message_fit_in(msg)
+    # Extract system prompt before message_fit_in to preserve it
+    system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
+    
+    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
-    prompt = msg[0]["content"]
+    
+    # Ensure system message is preserved (message_fit_in keeps it at index 0)
+    prompt = msg[0]["content"] if msg[0]["role"] == "system" else system_prompt
 
     if "max_tokens" in gen_conf:
         gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
