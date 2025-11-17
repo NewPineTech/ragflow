@@ -1270,7 +1270,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
                     for m in messages if m["role"] != "system"])
     
-    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
+    used_token_count, msg = message_fit_in(msg)
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     prompt = msg[0]["content"]
 
