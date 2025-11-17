@@ -207,7 +207,7 @@ class Base(ABC):
             total_tokens += len(text.split())  # nhẹ hơn num_tokens_from_string
             if choice.finish_reason == "length":
                 text += LENGTH_NOTIFICATION_CN if is_chinese(text) else LENGTH_NOTIFICATION_EN
-            logging.info(f"[LLM Stream RESPONSE] {text}"+" timestamp:"+str(int(time.time())))
+            #logging.info(f"[LLM Stream RESPONSE] {text}"+" timestamp:"+str(int(time.time())))
 
             yield text, total_tokens
 
