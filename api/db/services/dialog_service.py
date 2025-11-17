@@ -1060,9 +1060,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
     print("Classify:", classify) #Classify: ['GREET']
     if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
-        print("Use solo chat for greeting or sensitive question or no knowledge base.")
-        system_parts = [system_content, f"\n## Context:{datetime_info}"]
-    
+        print("Use solo chat for greeting or sensitive question or no knowledge base.")    
 
         for ans in chat_solo(dialog, messages, stream, memory_text):
             yield ans
@@ -1071,7 +1069,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     # Additional check: No KB configured
     if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
         logging.info("[CHATV1] No KB configured, falling back to chat_solo")
-        for ans in chat_solo(dialog, messages, stream):
+        for ans in chat_solo(dialog, messages, stream, memory_text):
             yield ans
         return
 
