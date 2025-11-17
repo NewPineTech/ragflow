@@ -387,20 +387,31 @@ def chat_solo(dialog, messages, stream=True):
     if stream:
         last_ans = ""
         answer = ""
+        pending_words = []  # Words waiting to be yielded
         
         for ans in chat_mdl.chat_streamly(system_prompt+"\n"+system_content , msg[1:], {}):
             answer = ans
-            logging.info(f"[CHATV1 STREAM] Current answer {answer} length: {len(answer)}")
             delta_ans = answer[len(last_ans):]
             
-            # 🚀 WORD-BY-WORD STREAMING: Check delta for word boundary (not accumulated answer)
-            # Flush immediately after each complete word (ends with space)
-            if not should_flush(delta_ans):
+            if not delta_ans:
                 continue
             
-            last_ans = answer
-            # No TTS during streaming to avoid blocking
-            yield {"answer":  answer, "reference": {}, "audio_binary": None}
+            # 🚀 IMMEDIATE WORD-BY-WORD: Split delta and yield each word immediately
+            # This gives the illusion of faster streaming
+            words = delta_ans.split(' ')
+            
+            for i, word in enumerate(words):
+                if i < len(words) - 1:  # Complete word (has space after)
+                    last_ans += word + ' '
+                    yield {"answer": last_ans, "reference": {}, "audio_binary": None}
+                elif word:  # Last word (might be incomplete)
+                    # Check if it ends with punctuation (complete)
+                    if re.search(r'[.!?,;:。！？；、，：—]$', word):
+                        last_ans += word
+                        yield {"answer": last_ans, "reference": {}, "audio_binary": None}
+                    else:
+                        # Keep for next iteration
+                        pending_words.append(word)
         
         # Final chunk: Flush remaining text with TTS
         delta_ans = answer[len(last_ans):]

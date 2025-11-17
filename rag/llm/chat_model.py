@@ -171,6 +171,8 @@ class Base(ABC):
         return ans, total_token_count_from_response(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
+        logging.info("[LLM Strean BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2)+" timestamp:"+str(int(time.time())))
+
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=history,
@@ -205,6 +207,7 @@ class Base(ABC):
             total_tokens += len(text.split())  # nhẹ hơn num_tokens_from_string
             if choice.finish_reason == "length":
                 text += LENGTH_NOTIFICATION_CN if is_chinese(text) else LENGTH_NOTIFICATION_EN
+            logging.info(f"[LLM Stream RESPONSE] {text}"+" timestamp:"+str(int(time.time())))
 
             yield text, total_tokens
 
