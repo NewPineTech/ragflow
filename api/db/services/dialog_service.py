@@ -365,7 +365,7 @@ Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
-def chat_solo(dialog, messages, stream=True):
+def chat_solo(dialog, messages, stream=True, memory_text=None):
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
     else:
@@ -379,7 +379,8 @@ def chat_solo(dialog, messages, stream=True):
     # Lấy system prompt và thêm thông tin ngày giờ
     system_prompt = prompt_config.get("system", "")
     system_content = f"{datetime_info}\n\n{system_prompt}"
-    
+    if memory_text:
+        system_content += f"\n## Short Memory Summary: {memory_text}"
     tts_mdl = None
     if prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
@@ -389,7 +390,7 @@ def chat_solo(dialog, messages, stream=True):
         answer = ""
         pending_words = []  # Words waiting to be yielded
         
-        for ans in chat_mdl.chat_streamly(system_prompt+"\n"+system_content , msg[1:], {}):
+        for ans in chat_mdl.chat_streamly(system_content , msg[-1:], {}):
             answer = ans
             delta_ans = answer[len(last_ans):]
             
@@ -1054,11 +1055,16 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     #         yield ans
     #     return
     current_message=messages[-1]["content"]
+    # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
+    memory_text = kwargs.pop("short_memory", None)
     classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
     print("Classify:", classify) #Classify: ['GREET']
     if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
         print("Use solo chat for greeting or sensitive question or no knowledge base.")
-        for ans in chat_solo(dialog, messages, stream):
+        system_parts = [system_content, f"\n## Context:{datetime_info}"]
+    
+
+        for ans in chat_solo(dialog, messages, stream, memory_text):
             yield ans
         return
     
@@ -1121,9 +1127,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         if p["key"] not in kwargs:
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
     
-    # Extract memory from kwargs (loaded from Redis)
-    memory_text = kwargs.pop("short_memory", None)
-  
+   
     if len(questions) > 1 and prompt_config.get("refine_multiturn"):
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
