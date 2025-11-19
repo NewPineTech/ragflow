@@ -23,6 +23,11 @@ from api.db.services.common_service import CommonService
 from api.db.services.dialog_service import DialogService, chat, chatv1
 from common.misc_utils import get_uuid
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
+from api.utils.cache_utils import (
+    get_cached_dialog, cache_dialog,
+    get_cached_conversation, cache_conversation,
+    invalidate_conversation_cache
+)
 import json
 
 from rag.prompts.generator import chunks_format
@@ -95,8 +100,28 @@ def structure_answer(conv, ans, message_id, session_id):
 
 
 def completion(tenant_id, chat_id, question, name="New session", session_id=None, stream=True, **kwargs):
+    start_time = time.time()
+    print(f"[TIMING] completion() started at {start_time}")
+    
     assert name, "`name` can not be empty."
-    dia = DialogService.query(id=chat_id, tenant_id=tenant_id, status=StatusEnum.VALID.value)
+    
+    t1 = time.time()
+    # Try to get from cache first
+    cached_dialog = get_cached_dialog(chat_id, tenant_id)
+    if cached_dialog:
+        print(f"[CACHE] Dialog HIT: {chat_id}")
+        # Convert dict back to query result format
+        from api.db.db_models import Dialog
+        dia_obj = Dialog(**cached_dialog)
+        dia = [dia_obj]
+    else:
+        print(f"[CACHE] Dialog MISS: {chat_id}")
+        dia = DialogService.query(id=chat_id, tenant_id=tenant_id, status=StatusEnum.VALID.value)
+        if dia:
+            # Cache the dialog for future requests
+            cache_dialog(chat_id, tenant_id, dia[0].__dict__['__data__'])
+    print(f"[TIMING] DialogService.query took {time.time() - t1:.3f}s")
+    
     assert dia, "You do not own the chat."
 
     if not session_id:
@@ -122,7 +147,22 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             yield "data:" + json.dumps({"code": 0, "message": "", "data": True}, ensure_ascii=False) + "\n\n"
             return
 
-    conv = ConversationService.query(id=session_id, dialog_id=chat_id)
+    t2 = time.time()
+    # Try to get from cache first
+    cached_conv = get_cached_conversation(session_id, chat_id)
+    if cached_conv:
+        print(f"[CACHE] Conversation HIT: {session_id}")
+        # Convert dict back to query result format
+        conv_obj = Conversation(**cached_conv)
+        conv = [conv_obj]
+    else:
+        print(f"[CACHE] Conversation MISS: {session_id}")
+        conv = ConversationService.query(id=session_id, dialog_id=chat_id)
+        if conv:
+            # Cache the conversation for future requests
+            cache_conversation(session_id, chat_id, conv[0].__dict__['__data__'])
+    print(f"[TIMING] ConversationService.query took {time.time() - t2:.3f}s")
+    
     if not conv:
         raise LookupError("Session does not exist")
 
@@ -134,14 +174,22 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
         "id": str(uuid4())
     }
     conv.message.append(question)
+    
+    t3 = time.time()
     for m in conv.message:
         if m["role"] == "system":
             continue
         if m["role"] == "assistant" and not msg:
             continue
         msg.append(m)
+    print(f"[TIMING] Message processing took {time.time() - t3:.3f}s")
+    
     message_id = msg[-1].get("id")
+    
+    t4 = time.time()
     e, dia = DialogService.get_by_id(conv.dialog_id)
+    print(f"[TIMING] DialogService.get_by_id took {time.time() - t4:.3f}s")
+    print(f"[TIMING] Total before memory load: {time.time() - start_time:.3f}s")
 
     # Load memory from Redis
     logging.info(f"[MEMORY] Loading memory for session: {session_id}")
@@ -169,6 +217,9 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
+            # Invalidate cache after update
+            invalidate_conversation_cache(session_id, chat_id)
+            
             # Generate memory after stream completes
             print(f"[STREAM] Generating memory for session: {session_id}")
             generate_and_save_memory_async(session_id, dia, conv.message, old_memory=memory)
@@ -185,6 +236,9 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
         for ans in chat_func(dia, msg, False, **kwargs):
             answer = structure_answer(conv, ans, message_id, session_id)
             ConversationService.update_by_id(conv.id, conv.to_dict())
+            
+            # Invalidate cache after update
+            invalidate_conversation_cache(session_id, chat_id)
             break
         
         # Generate memory after non-stream completes
