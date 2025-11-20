@@ -190,7 +190,11 @@ def get_current_datetime_info():
     Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
     Returns: String chứa thông tin ngày giờ
     """
-    now = datetime.now()
+    from datetime import timezone, timedelta
+    
+    # Chuyển sang múi giờ GMT+7 (Việt Nam)
+    gmt7 = timezone(timedelta(hours=7))
+    now = datetime.now(gmt7)
     
     # Ngày dương lịch
     solar_date = now.strftime("%d/%m/%Y")
@@ -214,8 +218,15 @@ def get_current_datetime_info():
         try:
             solar = Solar(now.year, now.month, now.day)
             lunar = Converter.Solar2Lunar(solar)
-            lunar_date = f"{lunar.day}/{lunar.month}/{lunar.year}"
-            datetime_info += f" (Âm lịch: {lunar_date})"
+            
+            # Tính năm Can Chi (ví dụ: Tân Mão, Nhâm Thìn...)
+            can = ["Canh", "Tân", "Nhâm", "Quý", "Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ"]
+            chi = ["Thân", "Dậu", "Tuất", "Hợi", "Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi"]
+            can_index = (lunar.year - 4) % 10
+            chi_index = (lunar.year - 4) % 12
+            nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
+            
+            datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
         except Exception as e:
             logging.debug(f"Could not convert to lunar calendar: {e}")
     
