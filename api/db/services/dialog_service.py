@@ -415,28 +415,28 @@ def chat_solo(dialog, messages, stream=True, memory_text=None):
             for i, word in enumerate(words):
                 if i < len(words) - 1:  # Complete word (has space after)
                     last_ans += word + ' '
-                    yield {"answer": last_ans, "reference": {}, "audio_binary": None}
+                    yield {"answer": last_ans, "reference": {}, "audio_binary": None, "memory": None}
                 elif word:  # Last word (might be incomplete)
                     # Check if it ends with punctuation (complete)
                     if re.search(r'[.!?,;:。！？；、，：—]$', word):
                         last_ans += word
-                        yield {"answer": last_ans, "reference": {}, "audio_binary": None}
+                        yield {"answer": last_ans, "reference": {}, "audio_binary": None, "memory": None}
                     else:
                         # Keep for next iteration
                         pending_words.append(word)
         
-        # Final chunk: Flush remaining text with TTS
+        # Final chunk: Flush remaining text with TTS and memory
         delta_ans = answer[len(last_ans):]
         if delta_ans:
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans)}
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "memory": memory_text if memory_text else None}
         else:
             # Ensure we always send final response with proper format
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer)}
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
     else:
         answer = chat_mdl.chat(system_prompt+"\n"+system_content , msg[1:], {})
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer)}
+        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
 
 
 def chat_solo_simple(dialog, last_message, stream=True):
@@ -1257,15 +1257,15 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         system_content = prompt_config["system"]
     
     # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
-    system_parts = [system_content, f"\n## Context:{datetime_info}"]
+    system_parts = [system_content, f"\n## Context:\n{datetime_info}"]
     
     if memory_text:
-        system_parts.append(f"\n##Memory: {memory_text}")
+        system_parts.append(f"\n## Memory:\n{memory_text}")
         logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        system_parts.append(f"\n## Knowledge Context: {kwargs['knowledge']}")
+        system_parts.append(f"\n## Knowledge:\n{kwargs['knowledge']}")
     
     # Single system message for better LLM compatibility
     msg = [{"role": "system", "content": "".join(system_parts)}]
