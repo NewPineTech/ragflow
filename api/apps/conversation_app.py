@@ -29,9 +29,14 @@ from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserTenantService
 from api.utils.api_utils import get_data_error_result, get_json_result, server_error_response, validate_request
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
+from api.utils.cache_utils import (
+    get_cached_dialog, cache_dialog,
+    get_cached_conversation, cache_conversation
+)
 from rag.prompts.template import load_prompt
 from rag.prompts.generator import chunks_format
 from common.constants import RetCode, LLMType
+import time
 
 
 use_v1 = True
@@ -197,20 +202,53 @@ def completion():
             chat_model_config[model_config] = config
 
     try:
-        e, conv = ConversationService.get_by_id(req["conversation_id"])
-        if not e:
-            return get_data_error_result(message="Conversation not found!")
-        
-        # Save conversation_id before deleting from req
+        start_time = time.time()
         conversation_id = req["conversation_id"]
         
         print(f"\n{'='*60}")
+        print(f"[TIMING] completion() started at {start_time}")
         print(f"[CONVERSATION] Processing conversation: {conversation_id}")
         print(f"[CONVERSATION] Stream mode: {req.get('stream', True)}")
         print(f"{'='*60}\n")
         
+        # Try to get conversation from cache first (write-through)
+        t1 = time.time()
+        # First, try to load from DB to get dialog_id (we need it for proper cache key)
+        e, conv = ConversationService.get_by_id(conversation_id)
+        if not e:
+            return get_data_error_result(message="Conversation not found!")
+        
+        # Now try cache with proper dialog_id
+        cached_conv = get_cached_conversation(conversation_id, conv.dialog_id)
+        if cached_conv:
+            print(f"[CACHE] Conversation HIT: {conversation_id}")
+            # Use cached data but preserve the connection
+            from api.db.db_models import Conversation
+            conv = Conversation(**cached_conv)
+        else:
+            print(f"[CACHE] Conversation MISS: {conversation_id}")
+            # Cache for future requests
+            cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+        print(f"[TIMING] ConversationService.get_by_id took {time.time() - t1:.3f}s")
+        
         conv.message = deepcopy(req["messages"])
-        e, dia = DialogService.get_by_id(conv.dialog_id)
+        
+        # Try to get dialog from cache first
+        t2 = time.time()
+        cached_dialog = get_cached_dialog(conv.dialog_id, current_user.id)
+        if cached_dialog:
+            print(f"[CACHE] Dialog HIT: {conv.dialog_id}")
+            from api.db.db_models import Dialog
+            dia = Dialog(**cached_dialog)
+            e = True
+        else:
+            print(f"[CACHE] Dialog MISS: {conv.dialog_id}")
+            e, dia = DialogService.get_by_id(conv.dialog_id)
+            if e and dia:
+                # Cache for future requests
+                cache_dialog(conv.dialog_id, current_user.id, dia.__dict__['__data__'])
+        print(f"[TIMING] DialogService.get_by_id took {time.time() - t2:.3f}s")
+        print(f"[TIMING] Total before memory load: {time.time() - start_time:.3f}s\n")
         if not e:
             return get_data_error_result(message="Dialog not found!")
         
@@ -251,6 +289,10 @@ def completion():
                 
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
+                    
+                    # Write-through cache: Update cache with new message instead of invalidating
+                    cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+                    print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
                 
                 # Generate memory AFTER chat completes
                 print(f"\n[STREAM] Chat completed, generating memory...")
@@ -278,6 +320,10 @@ def completion():
                 answer = structure_answer(conv, ans, message_id, conv.id)
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
+                    
+                    # Write-through cache: Update cache with new message instead of invalidating
+                    cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+                    print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
                 break
             
             # Generate memory after non-stream chat

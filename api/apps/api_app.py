@@ -17,6 +17,7 @@ import json
 import os
 import re
 import logging
+import time
 from datetime import datetime, timedelta
 from flask import request, Response
 from api.db.services.llm_service import LLMBundle
@@ -38,7 +39,7 @@ from common.misc_utils import get_uuid
 from common.constants import RetCode, VALID_TASK_STATUS, LLMType, ParserType, FileSource
 from api.utils.api_utils import server_error_response, get_data_error_result, get_json_result, validate_request, \
     generate_confirmation_token
-
+from api.utils.cache_utils import get_cached_dialog, cache_dialog, get_cached_conversation, cache_conversation
 from api.utils.file_utils import filename_type, thumbnail
 from rag.app.tag import label_question
 from rag.prompts.generator import keyword_extraction
@@ -193,9 +194,27 @@ def completion():
         return get_json_result(
             data=False, message='Authentication error: API key is invalid!"', code=RetCode.AUTHENTICATION_ERROR)
     req = request.json
-    e, conv = API4ConversationService.get_by_id(req["conversation_id"])
+    conversation_id = req["conversation_id"]
+    
+    # Load conversation from DB first to get dialog_id
+    e, conv = API4ConversationService.get_by_id(conversation_id)
     if not e:
         return get_data_error_result(message="Conversation not found!")
+    
+    # Try to load from cache using dialog_id
+    start_time = time.time()
+    cached_conv = get_cached_conversation(conversation_id, conv.dialog_id)
+    if cached_conv:
+        logging.info(f"[API-CACHE-HIT] Conversation loaded from cache in {(time.time() - start_time)*1000:.2f}ms")
+        conv_dict = cached_conv
+        # Reconstruct conversation object from cache
+        from api.db.db_models import API4Conversation
+        conv = API4Conversation(**conv_dict)
+    else:
+        logging.info(f"[API-CACHE-MISS] Conversation loaded from DB in {(time.time() - start_time)*1000:.2f}ms")
+        # Cache the conversation data
+        cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+    
     if "quote" not in req:
         req["quote"] = False
 
@@ -302,11 +321,22 @@ def completion():
             return get_json_result(data=result)
         
         conv.message.append(msg[-1])
-        e, dia = DialogService.get_by_id(conv.dialog_id)
-        if not e:
-            return get_data_error_result(message="Dialog not found!")
         
-        conversation_id = req["conversation_id"]
+        # Load dialog with cache
+        tenant_id = objs[0].tenant_id
+        start_time = time.time()
+        cached_dialog = get_cached_dialog(conv.dialog_id, tenant_id)
+        if cached_dialog:
+            logging.info(f"[API-CACHE-HIT] Dialog loaded from cache in {(time.time() - start_time)*1000:.2f}ms")
+            from api.db.db_models import Dialog
+            dia = Dialog(**cached_dialog)
+        else:
+            e, dia = DialogService.get_by_id(conv.dialog_id)
+            if not e:
+                return get_data_error_result(message="Dialog not found!")
+            logging.info(f"[API-CACHE-MISS] Dialog loaded from DB in {(time.time() - start_time)*1000:.2f}ms")
+            cache_dialog(conv.dialog_id, tenant_id, dia.__dict__['__data__'])
+        
         del req["conversation_id"]
         del req["messages"]
 
@@ -326,6 +356,9 @@ def completion():
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                                ensure_ascii=False) + "\n\n"
                 API4ConversationService.append_message(conv.id, conv.to_dict())
+                # Write-through: Update cache after conversation update
+                cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+                logging.info(f"[API-CACHE-UPDATE] Conversation cache updated (streaming)")
                 
             except Exception as e:
                 yield "data:" + json.dumps({"code": 500, "message": str(e),
@@ -348,6 +381,9 @@ def completion():
             answer = ans
             fillin_conv(ans)
             API4ConversationService.append_message(conv.id, conv.to_dict())
+            # Write-through: Update cache after conversation update
+            cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
+            logging.info(f"[API-CACHE-UPDATE] Conversation cache updated (non-streaming)")
             break
         rename_field(answer)
         

@@ -25,8 +25,7 @@ from common.misc_utils import get_uuid
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 from api.utils.cache_utils import (
     get_cached_dialog, cache_dialog,
-    get_cached_conversation, cache_conversation,
-    invalidate_conversation_cache
+    get_cached_conversation, cache_conversation
 )
 import json
 
@@ -148,18 +147,17 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             return
 
     t2 = time.time()
-    # Try to get from cache first
+    # Try to get from cache first (write-through cache strategy)
     cached_conv = get_cached_conversation(session_id, chat_id)
     if cached_conv:
         print(f"[CACHE] Conversation HIT: {session_id}")
-        # Convert dict back to query result format
         conv_obj = Conversation(**cached_conv)
         conv = [conv_obj]
     else:
         print(f"[CACHE] Conversation MISS: {session_id}")
         conv = ConversationService.query(id=session_id, dialog_id=chat_id)
         if conv:
-            # Cache the conversation for future requests
+            # Cache for future requests
             cache_conversation(session_id, chat_id, conv[0].__dict__['__data__'])
     print(f"[TIMING] ConversationService.query took {time.time() - t2:.3f}s")
     
@@ -217,8 +215,9 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
-            # Invalidate cache after update
-            invalidate_conversation_cache(session_id, chat_id)
+            # Write-through cache: Update cache with new message instead of invalidating
+            cache_conversation(session_id, chat_id, conv.__dict__['__data__'])
+            print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
             
             # Generate memory after stream completes
             print(f"[STREAM] Generating memory for session: {session_id}")
@@ -237,8 +236,9 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             answer = structure_answer(conv, ans, message_id, session_id)
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
-            # Invalidate cache after update
-            invalidate_conversation_cache(session_id, chat_id)
+            # Write-through cache: Update cache with new message instead of invalidating
+            cache_conversation(session_id, chat_id, conv.__dict__['__data__'])
+            print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
             break
         
         # Generate memory after non-stream completes
