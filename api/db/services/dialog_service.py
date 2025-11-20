@@ -190,7 +190,11 @@ def get_current_datetime_info():
     Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
     Returns: String chứa thông tin ngày giờ
     """
-    now = datetime.now()
+    from datetime import timezone, timedelta
+    
+    # Chuyển sang múi giờ GMT+7 (Việt Nam)
+    gmt7 = timezone(timedelta(hours=7))
+    now = datetime.now(gmt7)
     
     # Ngày dương lịch
     solar_date = now.strftime("%d/%m/%Y")
@@ -214,8 +218,15 @@ def get_current_datetime_info():
         try:
             solar = Solar(now.year, now.month, now.day)
             lunar = Converter.Solar2Lunar(solar)
-            lunar_date = f"{lunar.day}/{lunar.month}/{lunar.year}"
-            datetime_info += f" (Âm lịch: {lunar_date})"
+            
+            # Tính năm Can Chi (ví dụ: Tân Mão, Nhâm Thìn...)
+            can = ["Canh", "Tân", "Nhâm", "Quý", "Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ"]
+            chi = ["Thân", "Dậu", "Tuất", "Hợi", "Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi"]
+            can_index = (lunar.year - 4) % 10
+            chi_index = (lunar.year - 4) % 12
+            nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
+            
+            datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
         except Exception as e:
             logging.debug(f"Could not convert to lunar calendar: {e}")
     
@@ -1226,8 +1237,13 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     
     if not knowledges and prompt_config.get("empty_response"):
         empty_res = prompt_config["empty_response"]
-        yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions),
-               "audio_binary": tts(tts_mdl, empty_res)}
+        yield {
+            "answer": empty_res, 
+            "reference": kbinfos, 
+            "prompt": "\n\n### Query:\n%s" % " ".join(questions),
+            "audio_binary": tts(tts_mdl, empty_res),
+            "memory": memory_text if memory_text else None
+        }
         return
 
     kwargs["knowledge"] = ""
@@ -1283,7 +1299,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
 
     def decorate_answer(answer):
-        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer
+        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, memory_text
 
         refs = []
         ans = answer.split("</think>")
@@ -1362,7 +1378,13 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             langfuse_generation.update(output=langfuse_output)
             langfuse_generation.end()
 
-        return {"answer": think + answer, "reference": refs, "prompt": re.sub(r"\n", "  \n", prompt), "created_at": time.time()}
+        return {
+            "answer": think + answer, 
+            "reference": refs, 
+            "prompt": re.sub(r"\n", "  \n", prompt), 
+            "created_at": time.time(),
+            "memory": memory_text if memory_text else None
+        }
 
     if langfuse_tracer:
         langfuse_generation = langfuse_tracer.start_generation(
@@ -1386,12 +1408,12 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             
             last_ans = answer
             # No TTS during streaming to avoid blocking
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
         
         # Final chunk: Flush remaining text
         delta_ans = answer[len(last_ans):]
         if delta_ans:
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
         
         yield decorate_answer(thought + answer)
     else:
