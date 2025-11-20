@@ -1257,15 +1257,15 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         system_content = prompt_config["system"]
     
     # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
-    system_parts = [system_content, f"\n## Context:{datetime_info}"]
+    system_parts = [system_content, f"\n## Context:\n{datetime_info}"]
     
     if memory_text:
-        system_parts.append(f"\n##Memory: {memory_text}")
+        system_parts.append(f"\n## Memory:\n{memory_text}")
         logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        system_parts.append(f"\n## Knowledge Context: {kwargs['knowledge']}")
+        system_parts.append(f"\n## Knowledge:\n{kwargs['knowledge']}")
     
     # Single system message for better LLM compatibility
     msg = [{"role": "system", "content": "".join(system_parts)}]
