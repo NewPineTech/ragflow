@@ -1273,7 +1273,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     # Extract system prompt before message_fit_in to preserve it
     system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
     
-    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
+    used_token_count, msg = message_fit_in(msg)
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     
     # Ensure system message is preserved (message_fit_in keeps it at index 0)

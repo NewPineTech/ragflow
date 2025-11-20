@@ -23,6 +23,7 @@ from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.user_service import TenantService, UserTenantService
 from api.utils.api_utils import server_error_response, get_data_error_result, validate_request
+from api.utils.cache_utils import invalidate_dialog_cache
 from common.misc_utils import get_uuid
 from common.constants import RetCode
 from api.utils.api_utils import get_json_result
@@ -113,6 +114,8 @@ def set_dialog():
                 del req["kb_names"]
             if not DialogService.update_by_id(dialog_id, req):
                 return get_data_error_result(message="Dialog not found!")
+            # Invalidate cache after dialog update
+            invalidate_dialog_cache(dialog_id, current_user.id)
             e, dia = DialogService.get_by_id(dialog_id)
             if not e:
                 return get_data_error_result(message="Fail to update a dialog!")
