@@ -1237,8 +1237,13 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     
     if not knowledges and prompt_config.get("empty_response"):
         empty_res = prompt_config["empty_response"]
-        yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions),
-               "audio_binary": tts(tts_mdl, empty_res)}
+        yield {
+            "answer": empty_res, 
+            "reference": kbinfos, 
+            "prompt": "\n\n### Query:\n%s" % " ".join(questions),
+            "audio_binary": tts(tts_mdl, empty_res),
+            "memory": memory_text if memory_text else None
+        }
         return
 
     kwargs["knowledge"] = ""
@@ -1294,7 +1299,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
 
     def decorate_answer(answer):
-        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer
+        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, memory_text
 
         refs = []
         ans = answer.split("</think>")
@@ -1373,7 +1378,13 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             langfuse_generation.update(output=langfuse_output)
             langfuse_generation.end()
 
-        return {"answer": think + answer, "reference": refs, "prompt": re.sub(r"\n", "  \n", prompt), "created_at": time.time()}
+        return {
+            "answer": think + answer, 
+            "reference": refs, 
+            "prompt": re.sub(r"\n", "  \n", prompt), 
+            "created_at": time.time(),
+            "memory": memory_text if memory_text else None
+        }
 
     if langfuse_tracer:
         langfuse_generation = langfuse_tracer.start_generation(
@@ -1397,12 +1408,12 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             
             last_ans = answer
             # No TTS during streaming to avoid blocking
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
         
         # Final chunk: Flush remaining text
         delta_ans = answer[len(last_ans):]
         if delta_ans:
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": None}
+            yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
         
         yield decorate_answer(thought + answer)
     else:
