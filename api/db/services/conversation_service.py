@@ -108,18 +108,18 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     # Try to get from cache first
     cached_dialog = get_cached_dialog(chat_id, tenant_id)
     if cached_dialog:
-        print(f"[CACHE] Dialog HIT: {chat_id}")
+        #print(f"[CACHE] Dialog HIT: {chat_id}")
         # Convert dict back to query result format
         from api.db.db_models import Dialog
         dia_obj = Dialog(**cached_dialog)
         dia = [dia_obj]
     else:
-        print(f"[CACHE] Dialog MISS: {chat_id}")
+        #print(f"[CACHE] Dialog MISS: {chat_id}")
         dia = DialogService.query(id=chat_id, tenant_id=tenant_id, status=StatusEnum.VALID.value)
         if dia:
             # Cache the dialog for future requests
             cache_dialog(chat_id, tenant_id, dia[0].__dict__['__data__'])
-    print(f"[TIMING] DialogService.query took {time.time() - t1:.3f}s")
+    #print(f"[TIMING] DialogService.query took {time.time() - t1:.3f}s")
     
     assert dia, "You do not own the chat."
 
@@ -150,16 +150,16 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     # Try to get from cache first (write-through cache strategy)
     cached_conv = get_cached_conversation(session_id, chat_id)
     if cached_conv:
-        print(f"[CACHE] Conversation HIT: {session_id}")
+        #print(f"[CACHE] Conversation HIT: {session_id}")
         conv_obj = Conversation(**cached_conv)
         conv = [conv_obj]
     else:
-        print(f"[CACHE] Conversation MISS: {session_id}")
+        #print(f"[CACHE] Conversation MISS: {session_id}")
         conv = ConversationService.query(id=session_id, dialog_id=chat_id)
         if conv:
             # Cache for future requests
             cache_conversation(session_id, chat_id, conv[0].__dict__['__data__'])
-    print(f"[TIMING] ConversationService.query took {time.time() - t2:.3f}s")
+    #print(f"[TIMING] ConversationService.query took {time.time() - t2:.3f}s")
     
     if not conv:
         raise LookupError("Session does not exist")
@@ -217,12 +217,12 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             
             # Write-through cache: Update cache with new message instead of invalidating
             cache_conversation(session_id, chat_id, conv.__dict__['__data__'])
-            print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
+            #print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
             
             # Generate memory after stream completes
-            print(f"[STREAM] Generating memory for session: {session_id}")
+            #print(f"[STREAM] Generating memory for session: {session_id}")
             generate_and_save_memory_async(session_id, dia, conv.message, old_memory=memory)
-            print(f"[STREAM] Memory generation triggered")
+            #print(f"[STREAM] Memory generation triggered")
             
         except Exception as e:
             yield "data:" + json.dumps({"code": 500, "message": str(e),
@@ -238,13 +238,13 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
             
             # Write-through cache: Update cache with new message instead of invalidating
             cache_conversation(session_id, chat_id, conv.__dict__['__data__'])
-            print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
+            #print(f"[CACHE] Conversation cache updated (write-through): {session_id}")
             break
         
         # Generate memory after non-stream completes
-        print(f"[NON-STREAM] Generating memory for session: {session_id}")
+        #print(f"[NON-STREAM] Generating memory for session: {session_id}")
         generate_and_save_memory_async(session_id, dia, conv.message,old_memory=memory)
-        print(f"[NON-STREAM] Memory generation triggered")
+        #print(f"[NON-STREAM] Memory generation triggered")
         
         yield answer
 

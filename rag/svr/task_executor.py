@@ -987,7 +987,7 @@ async def report_status():
                 "current": current,
             })
             REDIS_CONN.zadd(CONSUMER_NAME, heartbeat, now.timestamp())
-            logging.info(f"{CONSUMER_NAME} reported heartbeat: {heartbeat}")
+            #logging.info(f"{CONSUMER_NAME} reported heartbeat: {heartbeat}")
 
             expired = REDIS_CONN.zcount(CONSUMER_NAME, 0, now.timestamp() - 60 * 30)
             if expired > 0:

@@ -221,15 +221,15 @@ def completion():
         # Now try cache with proper dialog_id
         cached_conv = get_cached_conversation(conversation_id, conv.dialog_id)
         if cached_conv:
-            print(f"[CACHE] Conversation HIT: {conversation_id}")
+            #print(f"[CACHE] Conversation HIT: {conversation_id}")
             # Use cached data but preserve the connection
             from api.db.db_models import Conversation
             conv = Conversation(**cached_conv)
         else:
-            print(f"[CACHE] Conversation MISS: {conversation_id}")
+            #print(f"[CACHE] Conversation MISS: {conversation_id}")
             # Cache for future requests
             cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
-        print(f"[TIMING] ConversationService.get_by_id took {time.time() - t1:.3f}s")
+        #print(f"[TIMING] ConversationService.get_by_id took {time.time() - t1:.3f}s")
         
         conv.message = deepcopy(req["messages"])
         
@@ -237,31 +237,31 @@ def completion():
         t2 = time.time()
         cached_dialog = get_cached_dialog(conv.dialog_id, current_user.id)
         if cached_dialog:
-            print(f"[CACHE] Dialog HIT: {conv.dialog_id}")
+            #print(f"[CACHE] Dialog HIT: {conv.dialog_id}")
             from api.db.db_models import Dialog
             dia = Dialog(**cached_dialog)
             e = True
         else:
-            print(f"[CACHE] Dialog MISS: {conv.dialog_id}")
+            #print(f"[CACHE] Dialog MISS: {conv.dialog_id}")
             e, dia = DialogService.get_by_id(conv.dialog_id)
             if e and dia:
                 # Cache for future requests
                 cache_dialog(conv.dialog_id, current_user.id, dia.__dict__['__data__'])
-        print(f"[TIMING] DialogService.get_by_id took {time.time() - t2:.3f}s")
-        print(f"[TIMING] Total before memory load: {time.time() - start_time:.3f}s\n")
+        #print(f"[TIMING] DialogService.get_by_id took {time.time() - t2:.3f}s")
+        #print(f"[TIMING] Total before memory load: {time.time() - start_time:.3f}s\n")
         if not e:
             return get_data_error_result(message="Dialog not found!")
         
         # Load memory from Redis BEFORE deleting from req
-        logging.info(f"[MEMORY] Attempting to load memory for conversation: {conversation_id}")
+        #logging.info(f"[MEMORY] Attempting to load memory for conversation: {conversation_id}")
         memory = get_memory_from_redis(conversation_id)
         if memory:
             req["short_memory"] = memory
-            logging.info(f"[MEMORY] ✓ Using memory from Redis for conversation: {conversation_id}")
-            print(f"[MEMORY] Loaded memory: {memory[:150]}...")
-        else:
-            logging.info(f"[MEMORY] No existing memory for conversation: {conversation_id}")
-            print(f"[MEMORY] No existing memory found")
+            #logging.info(f"[MEMORY] ✓ Using memory from Redis for conversation: {conversation_id}")
+            #print(f"[MEMORY] Loaded memory: {memory[:150]}...")
+        #else:
+            #logging.info(f"[MEMORY] No existing memory for conversation: {conversation_id}")
+            #print(f"[MEMORY] No existing memory found")
         
         del req["conversation_id"]
         del req["messages"]
@@ -292,14 +292,14 @@ def completion():
                     
                     # Write-through cache: Update cache with new message instead of invalidating
                     cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
-                    print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
+                    #print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
                 
                 # Generate memory AFTER chat completes
-                print(f"\n[STREAM] Chat completed, generating memory...")
-                print(f"[STREAM] conversation_id: {conversation_id}")
-                print(f"[STREAM] conv.message length: {len(conv.message)}")
+                #print(f"\n[STREAM] Chat completed, generating memory...")
+                #print(f"[STREAM] conversation_id: {conversation_id}")
+                #print(f"[STREAM] conv.message length: {len(conv.message)}")
                 generate_and_save_memory_async(conversation_id, dia, conv.message)
-                print(f"[STREAM] Memory generation triggered\n")
+                #print(f"[STREAM] Memory generation triggered\n")
                 
             except Exception as e:
                 logging.exception(e)
@@ -323,15 +323,15 @@ def completion():
                     
                     # Write-through cache: Update cache with new message instead of invalidating
                     cache_conversation(conversation_id, conv.dialog_id, conv.__dict__['__data__'])
-                    print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
+                    #print(f"[CACHE] Conversation cache updated (write-through): {conversation_id}")
                 break
             
             # Generate memory after non-stream chat
-            print(f"\n[NON-STREAM] Chat completed, generating memory...")
-            print(f"[NON-STREAM] conversation_id: {conversation_id}")
-            print(f"[NON-STREAM] conv.message length: {len(conv.message)}")
+            #print(f"\n[NON-STREAM] Chat completed, generating memory...")
+            #print(f"[NON-STREAM] conversation_id: {conversation_id}")
+            #print(f"[NON-STREAM] conv.message length: {len(conv.message)}")
             generate_and_save_memory_async(conversation_id, dia, conv.message)
-            print(f"[NON-STREAM] Memory generation triggered\n")
+            #print(f"[NON-STREAM] Memory generation triggered\n")
             
             return get_json_result(data=answer)
     except Exception as e:
