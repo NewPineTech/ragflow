@@ -161,6 +161,7 @@ ASK_SUMMARY = load_prompt("ask_summary")
 QUESTION_CLASSIFY_TEMPLATE = load_prompt("question_classify")
 BEGIN_ANSWER_TEMPLATE = load_prompt("begin_answer")
 MEMORY_PROMPT = load_prompt("short_term_memory_prompt")
+CLASSIFY_AND_RESPOND_TEMPLATE = load_prompt("classify_and_respond")
 
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
@@ -217,7 +218,7 @@ def full_question(tenant_id=None, llm_id=None, messages=[], language=None, chat_
         else:
             chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
     conv = []
-    for m in messages[-3:]:
+    for m in messages:
         if m["role"] not in ["user", "assistant"]:
             continue
         conv.append("{}: {}".format(m["role"].upper(), m["content"]))
@@ -520,7 +521,7 @@ def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, la
     for m in messages:
         if m["role"] not in ["user", "assistant"]:
             continue
-        conv.append("{}: {}".format(m["role"].upper(), m["content"]))
+        conv.append("{}: {}\n".format(m["role"].upper(), m["content"]))
     conversation = "\n".join(conv)
     if short_memory:
         conversation += "Historical memory:\n"
@@ -888,3 +889,7 @@ def relevant_chunks_with_toc(query: str, toc:list[dict], chat_mdl, topn: int=6):
     except Exception as e:
         logging.exception(e)
     return []
+
+def classify_and_respond_prompt():
+    template = PROMPT_JINJA_ENV.from_string(CLASSIFY_AND_RESPOND_TEMPLATE)
+    return template.render()

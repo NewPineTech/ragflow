@@ -47,7 +47,7 @@ from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
 from rag.prompts.generator import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
-    begin_chat, gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, short_memory
+     gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, classify_and_respond_prompt
 from common.token_utils import num_tokens_from_string
 from rag.utils.tavily_conn import Tavily
 from common.string_utils import remove_redundant_spaces
@@ -219,11 +219,16 @@ def get_current_datetime_info():
             solar = Solar(now.year, now.month, now.day)
             lunar = Converter.Solar2Lunar(solar)
             
-            # Tính năm Can Chi (ví dụ: Tân Mão, Nhâm Thìn...)
-            can = ["Canh", "Tân", "Nhâm", "Quý", "Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ"]
-            chi = ["Thân", "Dậu", "Tuất", "Hợi", "Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi"]
-            can_index = (lunar.year - 4) % 10
-            chi_index = (lunar.year - 4) % 12
+            # Tính năm Can Chi
+            # Can: Giáp, Ất, Bính, Đinh, Mậu, Kỷ, Canh, Tân, Nhâm, Quý (10 can)
+            # Chi: Tý, Sửu, Dần, Mão, Thìn, Tỵ, Ngọ, Mùi, Thân, Dậu, Tuất, Hợi (12 chi)
+            # Công thức: Can = (year - 4) % 10, Chi = (year - 4) % 12
+            # Năm 2024 = Giáp Thìn (2024 - 4 = 2020, 2020 % 10 = 0 -> Giáp, 2020 % 12 = 4 -> Thìn)
+            # Năm 2025 = Ất Tỵ (2025 - 4 = 2021, 2021 % 10 = 1 -> Ất, 2021 % 12 = 5 -> Tỵ)
+            can = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
+            chi = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+            can_index = (now.year - 4) % 10
+            chi_index = (now.year - 4) % 12
             nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
             
             datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
@@ -274,7 +279,8 @@ def classify_and_respond(dialog, messages, stream=True):
     
     Returns: (classify_type, response_generator)
         - classify_type: "KB" | "GREET" | "SENSITIVE"
-        - response_generator: Generator yielding response chunks if not KB
+        - response_generator: Generator yielding response chunks if with KB
+
     """
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
@@ -283,31 +289,10 @@ def classify_and_respond(dialog, messages, stream=True):
 
     prompt_config = dialog.prompt_config
     datetime_info = get_current_datetime_info()
-    
     # Combined system prompt: Classify + Respond
     system_content = f"""{datetime_info}
-
-{prompt_config.get("system", "")}
-
-## IMPORTANT INSTRUCTIONS:
-1. First, classify the user's question into ONE category:
-   - KB: Requires knowledge base lookup (questions about specific topics, facts, procedures)
-   - GREET: Greeting, chitchat, or general conversation
-   - SENSITIVE: Inappropriate, harmful, or off-topic content
-
-2. Response format:
-   - If KB: Start with "[CLASSIFY:KB]" then stop (no answer needed)
-   - If GREET or SENSITIVE: Start with "[CLASSIFY:GREET]" or "[CLASSIFY:SENSITIVE]" then provide a friendly response
-
-Example:
-User: "Xin chào thầy"
-Assistant: [CLASSIFY:GREET] Chào con, thầy rất vui được gặp con.
-
-User: "Bát quan trai là gì?"
-Assistant: [CLASSIFY:KB]
-
-User: "Thầy khỏe không?"
-Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
+                    {prompt_config.get("system", "")}
+                    {classify_and_respond_prompt()}"""
 
     tts_mdl = None
     if prompt_config.get("tts"):
@@ -327,29 +312,35 @@ Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
             if classify_type is None:
                 if "[CLASSIFY:KB]" in answer:
                     classify_type = "KB"
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected KB classification")
-                    return classify_type, None  # No response needed for KB
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected KB classification - yielding for KB retrieval")
+                    yield "KB"  # Yield string to signal KB needed
+                    return  # Stop generator after yielding classification
                 elif "[CLASSIFY:GREET]" in answer:
                     classify_type = "GREET"
-                    answer = answer.replace("[CLASSIFY:GREET]", "").strip()
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected GREET, answer after strip: {answer[:100]}")
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected GREET, original answer: {answer[:100]}")
                 elif "[CLASSIFY:SENSITIVE]" in answer:
                     classify_type = "SENSITIVE"
-                    answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected SENSITIVE, answer after strip: {answer[:100]}")
+                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected SENSITIVE, original answer: {answer[:100]}")
             
-            # Stream response for GREET/SENSITIVE
+            # Stream response for GREET/SENSITIVE - strip classification prefix EVERY time
             if classify_type in ["GREET", "SENSITIVE"]:
+                # Remove classification prefix from answer
+                answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
+                
                 delta_ans = answer[len(last_ans):]
                 # Yield immediately if we have enough content (reduced threshold for faster response)
                 if len(answer) >= 10:  # Changed from token count to char count for simplicity
                     if len(delta_ans) > 0:  # Yield any new content
                         last_ans = answer
+         
                         logging.debug(f"[CLASSIFY_AND_RESPOND] Yielding delta: {delta_ans[:50]}...")
                         yield {"answer": answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time()}
         
         # Final chunk - always yield to ensure response is sent
         if classify_type in ["GREET", "SENSITIVE"]:
+            # Ensure classification prefix is removed from final answer
+            answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
+            
             if len(answer) > len(last_ans):  # Only if there's new content
                 delta_ans = answer[len(last_ans):]
                 logging.info(f"[CLASSIFY_AND_RESPOND] Final yield, answer length: {len(answer)}, delta: {len(delta_ans)}")
@@ -357,12 +348,19 @@ Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
             elif len(answer) > 0:  # Ensure we send at least the complete answer
                 logging.info(f"[CLASSIFY_AND_RESPOND] Final yield (complete answer): {answer[:100]}...")
                 yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+        elif classify_type is None and answer:
+            # Fallback: LLM didn't return proper format, default to KB
+            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected in answer,  Answer: {answer[:100]}...")
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+
     else:
         answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
         
         # Extract classification
         if "[CLASSIFY:KB]" in answer:
-            return "KB", None
+            logging.info(f"[CLASSIFY_AND_RESPOND] Non-stream: Detected KB classification")
+            yield "KB"  # Yield string to signal KB needed
+            return  # Stop generator after yielding classification
         elif "[CLASSIFY:GREET]" in answer:
             classify_type = "GREET"
             answer = answer.replace("[CLASSIFY:GREET]", "").strip()
@@ -370,7 +368,10 @@ Assistant: [CLASSIFY:GREET] Thầy khỏe, cảm ơn con đã hỏi."""
             classify_type = "SENSITIVE"
             answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
         else:
-            classify_type = "GREET"  # Default fallback
+            # Fallback: No classification found, default to KB
+            logging.warning(f"[CLASSIFY_AND_RESPOND] Non-stream: No classification detected,  Answer: {answer[:100]}...")
+            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+            return
         
         logging.debug(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {answer}")
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
@@ -839,13 +840,13 @@ def chat(dialog, messages, stream=True, **kwargs):
     # Nếu có memory, chỉ gửi câu hỏi cuối cùng (memory đã chứa context lịch sử)
     # Nếu không có memory, gửi toàn bộ lịch sử chat
     if memory_text:
-        logging.info("[MEMORY] Using memory - only sending last user message to LLM")
-        print("[MEMORY] Using memory context - sending only last message")
+        #logging.info("[MEMORY] Using memory - only sending last user message to LLM")
+        #print("[MEMORY] Using memory context - sending only last message")
         # Chỉ lấy message cuối cùng từ user
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages[-1:] if m["role"] != "system"])
     else:
-        logging.info("[MEMORY] No memory - sending full conversation history to LLM")
-        print("[MEMORY] No memory - sending full history")
+        #logging.info("[MEMORY] No memory - sending full conversation history to LLM")
+        #print("[MEMORY] No memory - sending full history")
         # Gửi toàn bộ lịch sử
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"])
     
@@ -1050,32 +1051,43 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         dict: Response chunks with answer, reference, audio_binary
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
-
-    # # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
-    # # Returns immediately if KB not needed, otherwise proceeds with retrieval
-    # result = classify_and_respond(dialog, messages, stream)
-    
-    # # Check if it's a simple classify result (KB needed)
-    # if isinstance(result, tuple) and result[0] == "KB":
-    #     logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
-    #     # Continue with normal KB flow below
-    # else:
-    #     # GREET or SENSITIVE - response already generated, yield and return
-    #     logging.info(f"[CHATV1] Non-KB question - response generated in classify_and_respond")
-    #     for ans in result:
-    #         yield ans
-    #     return
     current_message=messages[-1]["content"]
     # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
     memory_text = kwargs.pop("short_memory", None)
-    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
-    print("Classify:", classify) #Classify: ['GREET']
-    if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
-        print("Use solo chat for greeting or sensitive question or no knowledge base.")    
+    
+    # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
+    # Returns immediately if KB not needed, otherwise proceeds with retrieval
+    result_gen = classify_and_respond(dialog, messages, stream)
+    
+    # Try to get the first item from the generator
+    try:
+        first_item = next(result_gen)      
+        # Check if it's a KB classification (returns string "KB")
+        if first_item == "KB":
+            logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
+            # Continue with normal KB flow below
+        else:
+            # GREET or SENSITIVE - first_item is a response dict, yield it and continue with rest
+            logging.info(f"[CHATV1] Non-KB question - streaming response from classify_and_respond")
+            yield first_item
+            # Yield remaining responses from generator
+            for ans in result_gen:
+                yield ans
+            return
+    except StopIteration:
+        # Generator is empty - this should not happen due to fallback in classify_and_respond
+        # Default to KB retrieval as fallback
+        logging.warning(f"[CHATV1] classify_and_respond returned empty generator - defaulting to KB retrieval")
+        # Continue with normal KB flow below
+    
+    #classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
+    #if (classify == "GREET" or classify=="SENSITIVE") or classify=="UNKNOWN" or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
+    #    print("Use solo chat for greeting or sensitive question or no knowledge base.")    
 
-        for ans in chat_solo(dialog, messages, stream, memory_text):
-            yield ans
-        return
+    #    for ans in chat_solo(dialog, messages, stream, memory_text):
+    #        yield ans
+    #    return
+    
     
     # Additional check: No KB configured
     if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
@@ -1083,6 +1095,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         for ans in chat_solo(dialog, messages, stream, memory_text):
             yield ans
         return
+    logging.info("[CHATV1] contineuing with KB retrieval flow")
 
     chat_start_ts = timer()
 
@@ -1137,7 +1150,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
     
    
-    if len(questions) > 1 and prompt_config.get("refine_multiturn"):
+    if len(questions) > 1 :
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
@@ -1279,12 +1292,16 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     # 🎯 MEMORY OPTIMIZATION: Only send last message if memory exists
     if memory_text:
         logging.info("[CHATV1] Using memory - sending only last user message")
-        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", " ".join(questions))} 
                     for m in messages[-1:] if m["role"] != "system"])
+        logging.debug(f"[CHATV1] memory - Last message sent: {msg}")
     else:
         logging.info("[CHATV1] No memory - sending full conversation history")
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
                     for m in messages if m["role"] != "system"])
+        #replace last user message with questions
+        msg[-1]["content"] = re.sub(r"##\d+\$\$", "", " ".join(questions))
+        logging.debug(f"[CHATV1] memory - Full messages sent: {msg}")
     
     # Extract system prompt before message_fit_in to preserve it
     system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""

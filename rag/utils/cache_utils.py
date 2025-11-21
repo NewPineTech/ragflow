@@ -137,7 +137,7 @@ def cache_retrieval(ttl: int = 60):
             # Generate cache key
             cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, **kwargs)
             
-            print(f"[CACHE] Key: {cache_key[:16]}... for query: {str(query)[:50]}...")
+            #print(f"[CACHE] Key: {cache_key[:16]}... for query: {str(query)[:50]}...")
 
             # 1️⃣ Kiểm tra Redis cache
             if REDIS_CONN:
@@ -146,7 +146,7 @@ def cache_retrieval(ttl: int = 60):
                     if data:
                         result = json.loads(data)
                         result["_cached"] = True
-                        print(f"[CACHE] ✓ HIT from Redis for {func.__name__}")
+                        #print(f"[CACHE] ✓ HIT from Redis for {func.__name__}")
                         return result
                 except Exception as e:
                     print(f"[CACHE] Redis read error: {e}")
@@ -156,18 +156,18 @@ def cache_retrieval(ttl: int = 60):
                 result, ts = _cache_memory[cache_key]
                 if time.time() - ts < ttl:
                     result["_cached"] = True
-                    print(f"[CACHE] ✓ HIT from memory for {func.__name__}")
+                    #print(f"[CACHE] ✓ HIT from memory for {func.__name__}")
                     return result
                 else:
                     # Expired, remove it
                     del _cache_memory[cache_key]
 
             # 3️⃣ Cache MISS - chạy function thật
-            print(f"[CACHE] MISS - executing {func.__name__}")
+            #print(f"[CACHE] MISS - executing {func.__name__}")
             start_time = time.time()
             result = func(*args, **kwargs)
             elapsed = time.time() - start_time
-            print(f"[CACHE] Execution took {elapsed:.2f}s")
+            #print(f"[CACHE] Execution took {elapsed:.2f}s")
 
             # 4️⃣ Lưu vào cache
             try:
@@ -180,13 +180,13 @@ def cache_retrieval(ttl: int = 60):
                     if success:
                         print(f"[CACHE] ✓ Saved to Redis (TTL: {ttl}s)")
                     else:
-                        print(f"[CACHE] ✗ Failed to save to Redis")
+                        #print(f"[CACHE] ✗ Failed to save to Redis")
                         # Fallback to memory
                         _cache_memory[cache_key] = (result, time.time())
-                        print(f"[CACHE] ✓ Saved to memory cache")
+                        #print(f"[CACHE] ✓ Saved to memory cache")
                 else:
                     _cache_memory[cache_key] = (result, time.time())
-                    print(f"[CACHE] ✓ Saved to memory cache (TTL: {ttl}s)")
+                    #print(f"[CACHE] ✓ Saved to memory cache (TTL: {ttl}s)")
                     
             except Exception as e:
                 print(f"[CACHE][ERROR] Failed to cache result: {e}")

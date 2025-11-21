@@ -118,9 +118,9 @@ def get_cached_dialog(dialog_id: str, tenant_id: str) -> Optional[Dict[str, Any]
         cached = REDIS_CONN.get(key)
         if cached:
             data = json.loads(cached.decode('utf-8') if isinstance(cached, bytes) else cached)
-            logging.debug(f"[CACHE] Dialog HIT: {dialog_id}")
+            #logging.debug(f"[CACHE] Dialog HIT: {dialog_id}")
             return data
-        logging.debug(f"[CACHE] Dialog MISS: {dialog_id}")
+        #logging.debug(f"[CACHE] Dialog MISS: {dialog_id}")
         return None
     except Exception as e:
         logging.error(f"[CACHE] Failed to get dialog cache: {e}")
@@ -166,9 +166,9 @@ def get_cached_conversation(session_id: str, dialog_id: str) -> Optional[Dict[st
         cached = REDIS_CONN.get(key)
         if cached:
             data = json.loads(cached.decode('utf-8') if isinstance(cached, bytes) else cached)
-            logging.debug(f"[CACHE] Conversation HIT: {session_id}")
+            #logging.debug(f"[CACHE] Conversation HIT: {session_id}")
             return data
-        logging.debug(f"[CACHE] Conversation MISS: {session_id}")
+        #logging.debug(f"[CACHE] Conversation MISS: {session_id}")
         return None
     except Exception as e:
         logging.error(f"[CACHE] Failed to get conversation cache: {e}")
@@ -211,14 +211,14 @@ def cache_conversation(session_id: str, dialog_id: str, conv_data: Dict[str, Any
                 # Don't cache messages and reference - they change frequently
                 "_cached_strategy": "METADATA"
             }
-            logging.debug(f"[CACHE] Caching conversation metadata only: {session_id}")
+            #logging.debug(f"[CACHE] Caching conversation metadata only: {session_id}")
         else:  # FULL
             cache_data = conv_data
-            logging.debug(f"[CACHE] Caching full conversation: {session_id}")
+            #logging.debug(f"[CACHE] Caching full conversation: {session_id}")
         
         result = REDIS_CONN.set(key, json.dumps(cache_data), CONVERSATION_CACHE_TTL)
-        if result:
-            logging.debug(f"[CACHE] Conversation cached ({strategy}): {session_id}")
+        #if result:
+        #    logging.debug(f"[CACHE] Conversation cached ({strategy}): {session_id}")
         return result
     except Exception as e:
         logging.error(f"[CACHE] Failed to cache conversation: {e}")
@@ -239,7 +239,7 @@ def invalidate_dialog_cache(dialog_id: str, tenant_id: str) -> bool:
     try:
         key = get_dialog_cache_key(dialog_id, tenant_id)
         REDIS_CONN.delete(key)
-        logging.debug(f"[CACHE] Dialog cache invalidated: {dialog_id}")
+        #logging.debug(f"[CACHE] Dialog cache invalidated: {dialog_id}")
         return True
     except Exception as e:
         logging.error(f"[CACHE] Failed to invalidate dialog cache: {e}")
@@ -260,7 +260,7 @@ def invalidate_conversation_cache(session_id: str, dialog_id: str) -> bool:
     try:
         key = get_conversation_cache_key(session_id, dialog_id)
         REDIS_CONN.delete(key)
-        logging.debug(f"[CACHE] Conversation cache invalidated: {session_id}")
+        #logging.debug(f"[CACHE] Conversation cache invalidated: {session_id}")
         return True
     except Exception as e:
         logging.error(f"[CACHE] Failed to invalidate conversation cache: {e}")

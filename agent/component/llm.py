@@ -282,7 +282,7 @@ class LLM(ComponentBase):
 
     def add_memory(self, user:str, assist:str, func_name: str, params: dict, results: str, user_defined_prompt:dict={}):
         summ = tool_call_summary(self.chat_mdl, func_name, params, results, user_defined_prompt)
-        logging.info(f"[MEMORY]: {summ}")
+        #logging.info(f"[MEMORY]: {summ}")
         self._canvas.add_memory(user, assist, summ)
 
     def thoughts(self) -> str:

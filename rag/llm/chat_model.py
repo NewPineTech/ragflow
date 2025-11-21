@@ -140,7 +140,7 @@ class Base(ABC):
         return gen_conf
 
     def _chat(self, history, gen_conf, **kwargs):
-        logging.info("[LLM BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2))
+        #logging.info("[LLM BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2))
         if self.model_name.lower().find("qwq") >= 0:
             logging.info(f"[INFO] {self.model_name} detected as reasoning model, using _chat_streamly")
 
@@ -167,11 +167,11 @@ class Base(ABC):
         ans = response.choices[0].message.content.strip()
         if response.choices[0].finish_reason == "length":
             ans = self._length_stop(ans)
-        logging.info(f"[LLM RESPONSE] {ans}")
+        #logging.info(f"[LLM RESPONSE] {ans}")
         return ans, total_token_count_from_response(response)
 
     def _chat_streamly(self, history, gen_conf, **kwargs):
-        logging.info("[LLM Strean BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2)+" timestamp:"+str(int(time.time())))
+        #logging.info("[LLM Strean BEGIN]" + json.dumps(history, ensure_ascii=False, indent=2)+" timestamp:"+str(int(time.time())))
 
         response = self.client.chat.completions.create(
             model=self.model_name,
@@ -1501,7 +1501,7 @@ class LiteLLMBase(ABC):
         ans = response.choices[0].message.content.strip()
         if response.choices[0].finish_reason == "length":
             ans = self._length_stop(ans)
-        logging.info(f"[LLM RESPONSE] {ans}")
+        #logging.info(f"[LLM RESPONSE] {ans}")
 
         return ans, total_token_count_from_response(response)
 

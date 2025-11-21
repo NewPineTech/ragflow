@@ -60,6 +60,7 @@ def get_memory_from_redis(conversation_id: str) -> Optional[str]:
         return None
 
 
+
 def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 720) -> bool:
     """
     Save memory to Redis with expiration.
@@ -67,7 +68,7 @@ def save_memory_to_redis(conversation_id: str, memory: str, expire_hours: int = 
     Args:
         conversation_id: Unique conversation identifier
         memory: Memory text to save
-        expire_hours: TTL in hours (default: 24)
+        expire_hours: TTL in hours (default: 720 hours = 30 days)
         
     Returns:
         True if saved successfully, False otherwise
@@ -95,11 +96,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
         dialog: Dialog object containing tenant_id and llm_id
         messages: List of conversation messages
     """
-    print(f"\n{'='*60}")
-    print(f"[MEMORY DEBUG] Function called for: {conversation_id}")
-    print(f"[MEMORY DEBUG] Dialog object: {dialog}")
-    print(f"[MEMORY DEBUG] Messages count: {len(messages)}")
-    print(f"{'='*60}\n")
+   
     
     def truncate_memory(text, max_words=100):
         words = text.strip().split()
@@ -110,8 +107,6 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
     def _generate_memory():
         """Inner function that runs in background thread"""
         try:
-            print(f"[MEMORY THREAD] Inside thread for: {conversation_id}")
-            print(f"[MEMORY THREAD] About to call short_memory()...")
             
             # Nếu đã có old_memory, chỉ cần 2 messages gần nhất
             messages_to_use = messages[-2:] if old_memory else messages
@@ -119,20 +114,15 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             # Call LLM to generate memory summary
             memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages_to_use, short_memory=old_memory)
             memory_text = truncate_memory(memory_text, max_words=100)
-            print(f"[MEMORY THREAD] short_memory() returned: {memory_text[:100] if memory_text else 'None'}...")
             
             if memory_text:
-                print(f"[MEMORY THREAD] Calling save_memory_to_redis()...")
                 result = save_memory_to_redis(conversation_id, memory_text)
-                print(f"[MEMORY THREAD] Save result: {result}")
-                if result:
-                    print(f"[MEMORY THREAD] ✓ SUCCESS - Memory saved for: {conversation_id}")
-                    logging.info(f"[MEMORY] Memory saved successfully for conversation: {conversation_id}")
-                else:
-                    print(f"[MEMORY THREAD] ✗ FAILED - Could not save to Redis")
-                    logging.error(f"[MEMORY] Failed to save memory for conversation: {conversation_id}")
+                print(f"\n[MEMORY]:\n  {memory_text}")
+                #if result:
+                #    logging.info(f"[MEMORY] Memory saved successfully for conversation: {conversation_id}")
+                #else:
+                #    logging.error(f"[MEMORY] Failed to save memory for conversation: {conversation_id}")
             else:
-                print(f"[MEMORY THREAD] ✗ No memory generated from short_memory()")
                 logging.warning(f"[MEMORY] No memory generated for conversation: {conversation_id}")
                 
         except Exception as e:
@@ -141,17 +131,13 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             traceback.print_exc()
     
     try:
-        print(f"[MEMORY DEBUG] Creating thread...")
         thread = threading.Thread(
             target=_generate_memory, 
             daemon=True, 
             name=f"MemoryGen-{conversation_id}"
         )
-        print(f"[MEMORY DEBUG] Starting thread...")
         thread.start()
-        print(f"[MEMORY DEBUG] ✓ Thread started successfully!")
         logging.info(f"[MEMORY] Started background thread for conversation: {conversation_id}")
     except Exception as e:
-        print(f"[MEMORY DEBUG] ✗ Failed to start thread: {e}")
         logging.error(f"[MEMORY] Failed to start memory generation thread: {e}")
         traceback.print_exc()
