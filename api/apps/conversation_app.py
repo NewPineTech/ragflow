@@ -281,10 +281,10 @@ def completion():
 
         is_embedded = bool(chat_model_id)
         def stream():
-            nonlocal dia, msg, req, conv, conversation_id
+            nonlocal dia, msg, req, conv, conversation_id, memory
             try:
                 for ans in chat_func(dia, msg, True, **req):
-                    ans = structure_answer(conv, ans, message_id, conv.id)
+                    ans = structure_answer(conv, ans, message_id, conv.id, memory)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
                 
                 if not is_embedded:
@@ -317,7 +317,7 @@ def completion():
         else:
             answer = None
             for ans in chat_func(dia, msg, **req):
-                answer = structure_answer(conv, ans, message_id, conv.id)
+                answer = structure_answer(conv, ans, message_id, conv.id, memory)
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
                     

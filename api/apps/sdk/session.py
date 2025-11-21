@@ -494,6 +494,8 @@ def agent_completions(tenant_id, agent_id):
 @manager.route("/chats/<chat_id>/sessions", methods=["GET"])  # noqa: F821
 @token_required
 def list_session(tenant_id, chat_id):
+    from rag.utils.redis_conn import REDIS_CONN
+    
     if not DialogService.query(tenant_id=tenant_id, id=chat_id, status=StatusEnum.VALID.value):
         return get_error_data_result(message=f"You don't own the assistant {chat_id}.")
     id = request.args.get("id")
@@ -510,6 +512,15 @@ def list_session(tenant_id, chat_id):
     if not convs:
         return get_result(data=[])
     for conv in convs:
+        # Load memory from Redis
+        conversation_id = conv.get("id")
+        if conversation_id:
+            memory_key = f"memory:{conversation_id}"
+            memory = REDIS_CONN.get(memory_key)
+            conv["memory"] = memory.decode('utf-8') if memory else ""
+        else:
+            conv["memory"] = ""
+        
         conv["messages"] = conv.pop("message")
         infos = conv["messages"]
         for info in infos:

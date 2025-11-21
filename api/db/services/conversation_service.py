@@ -72,7 +72,7 @@ class ConversationService(CommonService):
             offset += limit
         return res
 
-def structure_answer(conv, ans, message_id, session_id):
+def structure_answer(conv, ans, message_id, session_id, memory=""):
     reference = ans["reference"]
     if not isinstance(reference, dict):
         reference = {}
@@ -83,6 +83,7 @@ def structure_answer(conv, ans, message_id, session_id):
     reference["chunks"] = chunk_list
     ans["id"] = message_id
     ans["session_id"] = session_id
+    ans["memory"] = memory
 
     if not conv:
         return ans
@@ -211,7 +212,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     if stream:
         try:
             for ans in chat_func(dia, msg, True, **kwargs):
-                ans = structure_answer(conv, ans, message_id, session_id)
+                ans = structure_answer(conv, ans, message_id, session_id, memory)
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
@@ -233,7 +234,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     else:
         answer = None
         for ans in chat_func(dia, msg, False, **kwargs):
-            answer = structure_answer(conv, ans, message_id, session_id)
+            answer = structure_answer(conv, ans, message_id, session_id, memory)
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
             # Write-through cache: Update cache with new message instead of invalidating
@@ -252,6 +253,14 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
 def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwargs):
     e, dia = DialogService.get_by_id(dialog_id)
     assert e, "Dialog not found"
+    
+    # Load memory if session_id exists
+    memory = ""
+    if session_id:
+        memory = get_memory_from_redis(session_id)
+        if memory:
+            kwargs["short_memory"] = memory
+    
     if not session_id:
         session_id = get_uuid()
         conv = {
@@ -305,7 +314,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
     if stream:
         try:
             for ans in  chat_func(dia, msg, True, **kwargs):
-                ans = structure_answer(conv, ans, message_id, session_id)
+                ans = structure_answer(conv, ans, message_id, session_id, memory)
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                            ensure_ascii=False) + "\n\n"
             API4ConversationService.append_message(conv.id, conv.to_dict())
@@ -318,7 +327,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
     else:
         answer = None
         for ans in chat_func(dia, msg, False, **kwargs):
-            answer = structure_answer(conv, ans, message_id, session_id)
+            answer = structure_answer(conv, ans, message_id, session_id, memory)
             API4ConversationService.append_message(conv.id, conv.to_dict())
             break
         yield answer
