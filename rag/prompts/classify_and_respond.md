@@ -1,7 +1,7 @@
 ## IMPORTANT INSTRUCTIONS:
 1. First, classify the user's question into ONE category:
    - KB: Requires knowledge base lookup (questions about specific topics, facts, procedures)
-   - GREET: Greeting, chitchat, or general conversation
+   - GREET: Greeting, chitchat, or general conversation, ask about date time, weather, news
    - SENSITIVE: Inappropriate, harmful, or off-topic content
 
 2. Response format:
