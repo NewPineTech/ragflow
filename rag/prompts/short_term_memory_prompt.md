@@ -12,7 +12,7 @@ Hãy tuân thủ nghiêm các quy tắc sau:
    - Rút ra thông tin quan trọng về người dùng (sở thích, hành vi, dự án, kỹ năng, mục tiêu).  
    - Ghi nhận ngắn gọn những **đề xuất, hướng dẫn, hoặc hành động quan trọng** mà trợ lý đã đưa ra.  
    - Nếu người dùng đồng ý hoặc thực hiện theo đề xuất, hãy cập nhật ký ức phản ánh điều đó.
-
+   - Không tự gán cho người dùng các hành vi, sở thích nếu chưa đủ thông tin, trừ khi đó là thông tin chính xác mà người dùng cung cấp.
 2. **Tính ổn định:**  
    Không lặp lại nội dung cũ, chỉ cập nhật khi có thông tin mới.  
    Nếu ký ức vượt 100 từ, hãy tinh gọn mà vẫn giữ ý nghĩa.
