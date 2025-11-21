@@ -29,7 +29,7 @@ function usage() {
 ENABLE_WEBSERVER=1 # Default to enable web server
 ENABLE_TASKEXECUTOR=1  # Default to enable task executor
 ENABLE_MCP_SERVER=0
-ENABLE_ADMIN_SERVER=0 # Default close admin server
+ENABLE_ADMIN_SERVER=1 # Default close admin server
 CONSUMER_NO_BEG=0
 CONSUMER_NO_END=0
 WORKERS=4
@@ -150,9 +150,6 @@ done < "${TEMPLATE_FILE}"
 export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/"
 PY=python3
 
-python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-
 # -----------------------------------------------------------------------------
 # Function(s)
 # -----------------------------------------------------------------------------
@@ -233,18 +230,22 @@ if [[ "${ENABLE_WEBSERVER}" -eq 1 ]]; then
     echo "Starting nginx..."
     /usr/sbin/nginx
 
-    echo "Starting ragflow_server..."
-    while true; do
-        "$PY" api/ragflow_server.py
-    done &
-    sleep 30
+    echo "Starting ragflow_server with Uvicorn..."
+    #while true; do
+    uvicorn api.asgi:asgi_app \
+            --host 0.0.0.0 \
+            --port 9380 \
+            --workers 1 \
+            --timeout-keep-alive 30 \
+            --log-level debug &
+    #done &
 fi
 
 if [[ "${ENABLE_ADMIN_SERVER}" -eq 1 ]]; then
     echo "Starting admin_server..."
-    while true; do
-        "$PY" admin/server/admin_server.py
-    done &
+    #while true; do
+    #    "$PY" admin/server/admin_server.py &
+    #done &
 fi
 
 if [[ "${ENABLE_MCP_SERVER}" -eq 1 ]]; then
