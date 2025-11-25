@@ -19,6 +19,7 @@ from collections import defaultdict
 from copy import deepcopy
 import json_repair
 import pandas as pd
+from rag.utils.cache_utils import cache_retrieval
 import trio
 
 from common.misc_utils import get_uuid
@@ -138,6 +139,7 @@ class KGSearch(Dealer):
                                        idxnms, kb_ids)
         return self._ent_info_from_(es_res, 0)
 
+    @cache_retrieval(ttl=320)  
     def retrieval(self, question: str,
                tenant_ids: str | list[str],
                kb_ids: list[str],

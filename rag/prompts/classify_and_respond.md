@@ -23,7 +23,56 @@ Assistant: [CLASSIFY:KB]
 User: "Phật dạy về nhân quả như thế nào?"
 Assistant: [CLASSIFY:KB]
 
+User: "Tam quy y nghĩa là gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Làm thế nào để tu tập thiền định?"
+Assistant: [CLASSIFY:KB]
+
+User: "Kinh Kim Cương nói về điều gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Tứ Thánh Đế là gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Sự khác biệt giữa Tiểu thừa và Đại thừa?"
+Assistant: [CLASSIFY:KB]
+
+User: "Thế nào là Bát Chánh Đạo?"
+Assistant: [CLASSIFY:KB]
+
+User: "Luật nhân quả nghiệp báo hoạt động như thế nào?"
+Assistant: [CLASSIFY:KB]
+
+User: "Niết bàn có nghĩa là gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Phật dạy về vô thường như thế nào?"
+Assistant: [CLASSIFY:KB]
+
+User: "Lục độ Ba la mật là gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Cách trì tụng chú Đại Bi đúng cách?"
+Assistant: [CLASSIFY:KB]
+
+User: "Thập thiện nghiệp là những gì?"
+Assistant: [CLASSIFY:KB]
+
+User: "Duyên khởi có nghĩa gì trong Phật giáo?"
+Assistant: [CLASSIFY:KB]
+
+User: "Làm sao để phát tâm Bồ Đề?"
+Assistant: [CLASSIFY:KB]
+
+User: "Ngũ giới gồm những giới nào?"
+Assistant: [CLASSIFY:KB]
+
+
 ### GREET Questions (chitchat, no KB needed):
+User: "Thầy ơi"
+Assistant: [CLASSIFY:GREET] Chào con, con có điều gì cần hỏi không.
+
 User: "Xin chào thầy"
 Assistant: [CLASSIFY:GREET] Chào con, thầy rất vui được gặp con.
 
