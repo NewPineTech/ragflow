@@ -185,6 +185,40 @@ class DialogService(CommonService):
             offset += limit
         return res
 
+
+def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, min_delta_len=3):
+    """
+    🚀 UNIFIED STREAMING CORE: Stream LLM with delta length check
+    
+    Args:
+        chat_mdl: LLM model bundle
+        system_content: System prompt
+        messages: Message history
+        gen_conf: Generation config
+        min_delta_len: Minimum delta length to yield (default 3)
+    
+    Yields:
+        tuple: (accumulated_answer, delta_text, is_final)
+    """
+    last_ans = ""
+    answer = ""
+    
+    for ans in chat_mdl.chat_streamly(system_content, messages, gen_conf):
+        answer = ans
+        delta_ans = answer[len(last_ans):]
+        
+        if not delta_ans or len(delta_ans) < min_delta_len:
+            continue
+        
+        last_ans = answer
+        yield (answer, delta_ans, False)
+    
+    # Final chunk: ensure complete answer is yielded
+    if len(answer) > len(last_ans):
+        delta_ans = answer[len(last_ans):]
+        yield (answer, delta_ans, True)
+
+
 def get_current_datetime_info():
     """
     Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
@@ -238,41 +272,6 @@ def get_current_datetime_info():
     return datetime_info
 
 
-def should_flush(delta_text):
-    """
-    🚀 WORD-BY-WORD STREAMING: Flush after each complete word
-    
-    Strategy:
-    - Flush when delta ends with space (complete word)
-    - Flush when delta ends with punctuation
-    - Minimal threshold: Just need any content
-    
-    This ensures smooth word-by-word streaming without mid-word cuts.
-    """
-    if not delta_text:
-        return False
-    
-    # Strip to check actual content
-    text = delta_text.strip()
-    if not text:
-        return False
-    
-    # 1. Word boundary: Flush if ends with space (complete word)
-    if delta_text.endswith(' '):
-        return True
-    
-    # 2. Punctuation: Flush if ends with any punctuation
-    if re.search(r'[.!?,;:。！？；、，：—]\s*$', delta_text):
-        return True
-    
-    # 3. Minimum threshold: Flush if we have at least 1 word (fallback)
-    words = text.split()
-    if len(words) >= 1:
-        return True
-    
-    return False
-
-
 def classify_and_respond(dialog, messages, stream=True):
     """
     🚀 OPTIMIZED: Classify question + Generate response in ONE LLM call
@@ -301,56 +300,40 @@ def classify_and_respond(dialog, messages, stream=True):
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     
     if stream:
-        last_ans = ""
-        answer = ""
         classify_type = None
         
-        for ans in chat_mdl.chat_streamly(system_content, msg, dialog.llm_setting):
-            answer = ans
-            
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, dialog.llm_setting):            
             # Extract classification from first chunk
             if classify_type is None:
                 if "[CLASSIFY:KB]" in answer:
                     classify_type = "KB"
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected KB classification - yielding for KB retrieval")
-                    yield "KB"  # Yield string to signal KB needed
-                    return  # Stop generator after yielding classification
+                    yield "KB"
+                    return
                 elif "[CLASSIFY:GREET]" in answer:
                     classify_type = "GREET"
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected GREET, original answer: {answer[:100]}")
                 elif "[CLASSIFY:SENSITIVE]" in answer:
                     classify_type = "SENSITIVE"
-                    logging.info(f"[CLASSIFY_AND_RESPOND] Detected SENSITIVE, original answer: {answer[:100]}")
             
-            # Stream response for GREET/SENSITIVE - strip classification prefix EVERY time
+            # Remove classification prefix for GREET/SENSITIVE
             if classify_type in ["GREET", "SENSITIVE"]:
-                # Remove classification prefix from answer
                 answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
-                
-                delta_ans = answer[len(last_ans):]
-                # Yield immediately if we have enough content (reduced threshold for faster response)
-                if len(answer) >= 10:  # Changed from token count to char count for simplicity
-                    if len(delta_ans) > 0:  # Yield any new content
-                        last_ans = answer
-         
-                        logging.debug(f"[CLASSIFY_AND_RESPOND] Yielding delta: {delta_ans[:50]}...")
-                        yield {"answer": answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time()}
-        
-        # Final chunk - always yield to ensure response is sent
-        if classify_type in ["GREET", "SENSITIVE"]:
-            # Ensure classification prefix is removed from final answer
-            answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
             
-            if len(answer) > len(last_ans):  # Only if there's new content
-                delta_ans = answer[len(last_ans):]
-                logging.info(f"[CLASSIFY_AND_RESPOND] Final yield, answer length: {len(answer)}, delta: {len(delta_ans)}")
-                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
-            elif len(answer) > 0:  # Ensure we send at least the complete answer
-                logging.info(f"[CLASSIFY_AND_RESPOND] Final yield (complete answer): {answer[:100]}...")
+            # Yield response (for GREET/SENSITIVE/fallback)
+            if classify_type in ["GREET", "SENSITIVE", None]:
+                if is_final:
+                    yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+                else:
+                    yield {"answer": answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time()}
+        
+        # Ensure final response if nothing was yielded
+        if classify_type in ["GREET", "SENSITIVE"] and answer:
+            answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
+            if answer:  # Ensure we send at least the complete answer
+                logging.warning(f"[CLASSIFY_AND_RESPOND] Final yield (complete): {answer[:50]}...")
                 yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
         elif classify_type is None and answer:
-            # Fallback: LLM didn't return proper format, default to KB
-            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected in answer,  Answer: {answer[:100]}...")
+            # Fallback: LLM didn't return proper format, yield directly
+            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected. Answer: {answer[:100]}...")
             yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
     else:
@@ -373,7 +356,7 @@ def classify_and_respond(dialog, messages, stream=True):
             yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
             return
         
-        logging.debug(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {answer}")
+        logging.info(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {answer}")
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
@@ -398,106 +381,18 @@ def chat_solo(dialog, messages, stream=True, memory_text=None):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     if stream:
-        last_ans = ""
-        answer = ""
-        pending_words = []  # Words waiting to be yielded
-        
-        for ans in chat_mdl.chat_streamly(system_content , msg[-1:], {}):
-            answer = ans
-            delta_ans = answer[len(last_ans):]
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg[-1:], {}):
+            logging.debug(f"[CHAT_SOLO] Yielding delta_len={len(delta_ans)}: {answer[:50]}...")
             
-            if not delta_ans:
-                continue
-            
-            # 🚀 IMMEDIATE WORD-BY-WORD: Split delta and yield each word immediately
-            # This gives the illusion of faster streaming
-            words = delta_ans.split(' ')
-            
-            for i, word in enumerate(words):
-                if i < len(words) - 1:  # Complete word (has space after)
-                    last_ans += word + ' '
-                    yield {"answer": last_ans, "reference": {}, "audio_binary": None, "memory": None}
-                elif word:  # Last word (might be incomplete)
-                    # Check if it ends with punctuation (complete)
-                    if re.search(r'[.!?,;:。！？；、，：—]$', word):
-                        last_ans += word
-                        yield {"answer": last_ans, "reference": {}, "audio_binary": None, "memory": None}
-                    else:
-                        # Keep for next iteration
-                        pending_words.append(word)
-        
-        # Final chunk: Flush remaining text with TTS and memory
-        delta_ans = answer[len(last_ans):]
-        if delta_ans:
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "memory": memory_text if memory_text else None}
-        else:
-            # Ensure we always send final response with proper format
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
+            if is_final:
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "memory": memory_text if memory_text else None}
+            else:
+                yield {"answer": answer, "reference": {}, "audio_binary": None, "memory": None}
     else:
         answer = chat_mdl.chat(system_prompt+"\n"+system_content , msg[1:], {})
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
-
-
-def chat_solo_simple(dialog, last_message, stream=True):
-    """
-    Trả lời ngắn gọn để xác nhận/tóm tắt ý định của user trước khi retrieve.
-    Chỉ nhận message cuối cùng từ user.
-    Ví dụ: User hỏi "bát quan trai là gì" -> Trả lời: "Con muốn tìm hiểu về bát quan trai à."
-    
-    Args:
-        dialog: Dialog object
-        last_message: Dict containing the last user message, e.g. {"role": "user", "content": "..."}
-        stream: Boolean for streaming response
-    """
-    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
-    else:
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
-
-    tts_mdl = None
-    prompt_config = dialog.prompt_config
-    if prompt_config.get("tts"):
-        tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
-    
-    # Tạo system prompt cho việc xác nhận ý định ngắn gọn
-    simple_system_prompt = """Bạn là một trợ lý thân thiện và ngắn gọn. 
-                            Nhiệm vụ của bạn là xác nhận/tóm tắt lại ý định của người dùng một cách ngắn gọn, thân thiện.
-                            Chỉ trả lời 1-2 câu ngắn để xác nhận bạn đã hiểu câu hỏi, sau đó sẽ tìm kiếm thông tin chi tiết.
-                            liên quan đến phật pháp thì không được nói là tìm kiếm thông tin, mà là giảng giải.
-                            Ví dụ:
-                            - User: "bát quan trai là gì" -> Bot: "Con muốn tìm hiểu về bát quan trai à. Để thầy giảng giải cho con."
-                            - User: "con muốn tìm hiểu về tu tập" -> Bot: "Thầy rất vui khi con quan tâm đến việc tu tập."
-                            - User: "Thầy giảng cho con về phật pháp đi" -> Bot: "Thật là tốt khi con muốn tìm hiểu về phật pháp."
-                            Hãy trả lời thật ngắn gọn, thân thiện."""
-
-    # Chỉ lấy message cuối cùng
-    msg = [{"role": last_message["role"], "content": re.sub(r"##\d+\$\$", "", last_message["content"])}]
-    
-    # Cấu hình để trả lời ngắn gọn
-    simple_gen_conf = dialog.llm_setting.copy()
-    simple_gen_conf["max_tokens"] = 100  # Giới hạn để trả lời ngắn
-    simple_gen_conf["temperature"] = 0.7  # Tăng độ sáng tạo một chút
-    
-    if stream:
-        last_ans = ""
-        delta_ans = ""
-        for ans in chat_mdl.chat_streamly(simple_system_prompt, msg, simple_gen_conf):
-            answer = ans
-            delta_ans = ans[len(last_ans):]
-            if num_tokens_from_string(delta_ans) < 8:  # Ngưỡng thấp hơn để stream nhanh hơn
-                continue
-            last_ans = answer
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
-            delta_ans = ""
-        if delta_ans:
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
-    else:
-        answer = chat_mdl.chat(simple_system_prompt, msg, simple_gen_conf)
-        user_content = msg[-1].get("content", "[content not available]")
-        logging.debug("User: {}|Assistant (simple): {}".format(user_content, answer))
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
 def get_models(dialog):
@@ -1410,26 +1305,11 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         )
 
     if stream:
-        last_ans = ""
-        answer = ""
-        
-        for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, prompt + prompt4citation, msg[1:], gen_conf):
+            # Remove </think> tags if thought mode enabled
             if thought:
-                ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
-            answer = ans
-            delta_ans = answer[len(last_ans):]
+                answer = re.sub(r"^.*</think>", "", answer, flags=re.DOTALL)
             
-            # 🚀 INTELLIGENT STREAMING: Check full answer for boundaries (not just delta)
-            if not should_flush(answer):
-                continue
-            
-            last_ans = answer
-            # No TTS during streaming to avoid blocking
-            yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
-        
-        # Final chunk: Flush remaining text
-        delta_ans = answer[len(last_ans):]
-        if delta_ans:
             yield {"answer": thought + answer, "reference": {}, "audio_binary": None, "memory": None}
         
         yield decorate_answer(thought + answer)
