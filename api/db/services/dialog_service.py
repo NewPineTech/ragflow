@@ -1061,7 +1061,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
     
    
-    if len(questions) > 1 and prompt_config.get("refine_multiturn"):
+    if len(questions) > 1  #and prompt_config.get("refine_multiturn"):
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
