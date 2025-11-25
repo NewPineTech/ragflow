@@ -15,7 +15,7 @@ Hãy tuân thủ nghiêm các quy tắc sau:
    - Không tự gán cho người dùng các hành vi, sở thích nếu chưa đủ thông tin, trừ khi đó là thông tin chính xác mà người dùng cung cấp.
 2. **Tính ổn định:**  
    Không lặp lại nội dung cũ, chỉ cập nhật khi có thông tin mới.  
-   Nếu ký ức vượt 100 từ, hãy tinh gọn mà vẫn giữ ý nghĩa.
+   Nếu ký ức vượt 200 từ, hãy tinh gọn mà vẫn giữ ý nghĩa.
 
 3. **Tính chọn lọc:**  
    Bỏ qua các đoạn hội thoại xã giao hoặc vô nghĩa.  
@@ -23,7 +23,7 @@ Hãy tuân thủ nghiêm các quy tắc sau:
 
 4. **Tính ngắn gọn:**  
    Chỉ trả về **nội dung tóm tắt**, không kèm giải thích hay mô tả.  
-   Giới hạn tối đa **100 từ**.
+   Giới hạn tối đa **200 từ**.
 
 5. **Tính sạch:**  
    Không bao gồm code, XML, Markdown hoặc chi tiết kỹ thuật không cần thiết.

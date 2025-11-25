@@ -113,7 +113,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             
             # Call LLM to generate memory summary
             memory_text = short_memory(dialog.tenant_id, dialog.llm_id, messages_to_use, short_memory=old_memory)
-            memory_text = truncate_memory(memory_text, max_words=100)
+            memory_text = truncate_memory(memory_text, max_words=200)
             
             if memory_text:
                 result = save_memory_to_redis(conversation_id, memory_text)
