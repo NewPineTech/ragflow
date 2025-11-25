@@ -40,7 +40,7 @@ logger = logging.getLogger('ragflow.es_conn')
 
 
 @singleton
-class ESConnection(DocStoreConnection):
+class ESConnectionV1(DocStoreConnection):
     def __init__(self):
         self.info = {}
         logger.info(f"Use Elasticsearch {settings.ES['hosts']} as the doc engine.")
@@ -140,135 +140,215 @@ class ESConnection(DocStoreConnection):
     """
 
     def search(
-            self, selectFields: list[str],
-            highlightFields: list[str],
-            condition: dict,
-            matchExprs: list[MatchExpr],
-            orderBy: OrderByExpr,
-            offset: int,
-            limit: int,
-            indexNames: str | list[str],
-            knowledgebaseIds: list[str],
-            aggFields: list[str] = [],
-            rank_feature: dict | None = None
+        self, selectFields: list[str],
+        highlightFields: list[str],
+        condition: dict,
+        matchExprs: list[MatchExpr],
+        orderBy: OrderByExpr,
+        offset: int,
+        limit: int,
+        indexNames: str | list[str],
+        knowledgebaseIds: list[str],
+        aggFields: list[str] = [],
+        rank_feature: dict | None = None
     ):
         """
-        Refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html
+        RAG Enterprise Search (Version 1)
+        - Tách keyword search + semantic search (vector)
+        - Rerank (fusion)
+        - Không trộn KNN với query_string trong cùng 1 query
+        - Tối ưu hiệu năng Elasticsearch
         """
+
         if isinstance(indexNames, str):
             indexNames = indexNames.split(",")
-        assert isinstance(indexNames, list) and len(indexNames) > 0
-        assert "_id" not in condition
 
-        bqry = Q("bool", must=[])
+        assert isinstance(indexNames, list) and len(indexNames) > 0
+
+        # ---------------------------------------------------------------------
+        # 1) Build FILTER của toàn bộ query
+        # ---------------------------------------------------------------------
+        filter_q = Q("bool", must=[])
+
         condition["kb_id"] = knowledgebaseIds
         for k, v in condition.items():
             if k == "available_int":
                 if v == 0:
-                    bqry.filter.append(Q("range", available_int={"lt": 1}))
+                    filter_q.must.append(Q("range", available_int={"lt": 1}))
                 else:
-                    bqry.filter.append(
-                        Q("bool", must_not=Q("range", available_int={"lt": 1})))
+                    filter_q.must.append(
+                        Q("bool", must_not=Q("range", available_int={"lt": 1}))
+                    )
                 continue
+
             if not v:
                 continue
+
             if isinstance(v, list):
-                bqry.filter.append(Q("terms", **{k: v}))
-            elif isinstance(v, str) or isinstance(v, int):
-                bqry.filter.append(Q("term", **{k: v}))
+                filter_q.must.append(Q("terms", **{k: v}))
+            elif isinstance(v, (str, int)):
+                filter_q.must.append(Q("term", **{k: v}))
             else:
                 raise Exception(
-                    f"Condition `{str(k)}={str(v)}` value type is {str(type(v))}, expected to be int, str or list.")
+                    f"Condition `{k}={v}` type {type(v)} invalid."
+                )
 
-        s = Search()
-        vector_similarity_weight = 0.5
+        # =====================================================================
+        # 2) Parse matchExprs → tách thành: text_query + vector_query
+        # =====================================================================
+        text_query = None
+        vector_query = None
+        vector_size = 0
+        vector_field = ""
+        topk = 128    # semantic top k
+        num_candidates = 256
+        vector_data = None
+        fusion_weight_vector = 0.5
+
         for m in matchExprs:
-            if isinstance(m, FusionExpr) and m.method == "weighted_sum" and "weights" in m.fusion_params:
-                assert len(matchExprs) == 3 and isinstance(matchExprs[0], MatchTextExpr) and isinstance(matchExprs[1],
-                                                                                                        MatchDenseExpr) and isinstance(
-                    matchExprs[2], FusionExpr)
-                weights = m.fusion_params["weights"]
-                vector_similarity_weight = get_float(weights.split(",")[1])
-        for m in matchExprs:
+            # -----------------------------
+            # TEXT QUERY
+            # -----------------------------
             if isinstance(m, MatchTextExpr):
-                minimum_should_match = m.extra_options.get("minimum_should_match", 0.0)
-                if isinstance(minimum_should_match, float):
-                    minimum_should_match = str(int(minimum_should_match * 100)) + "%"
-                bqry.must.append(Q("query_string", fields=m.fields,
-                                   type="best_fields", query=m.matching_text,
-                                   minimum_should_match=minimum_should_match,
-                                   boost=1))
-                bqry.boost = 1.0 - vector_similarity_weight
+                ms = m.extra_options.get("minimum_should_match", 0.0)
+                if isinstance(ms, float):
+                    ms = str(int(ms * 100)) + "%"
+                text_query = Q(
+                    "query_string",
+                    fields=m.fields,
+                    type="best_fields",
+                    query=m.matching_text,
+                    minimum_should_match=ms
+                )
 
+            # -----------------------------
+            # VECTOR QUERY
+            # -----------------------------
             elif isinstance(m, MatchDenseExpr):
-                assert (bqry is not None)
-                similarity = 0.0
-                if "similarity" in m.extra_options:
-                    similarity = m.extra_options["similarity"]
-                s = s.knn(m.vector_column_name,
-                          m.topn,
-                          m.topn * 2,
-                          query_vector=list(m.embedding_data),
-                          filter=bqry.to_dict(),
-                          similarity=similarity,
-                          )
+                vector_field = m.vector_column_name
+                topk = m.topn if m.topn > 0 else 128
+                num_candidates = topk * 2
+                vector_data = list(m.embedding_data)
 
-        if bqry and rank_feature:
-            for fld, sc in rank_feature.items():
-                if fld != PAGERANK_FLD:
-                    fld = f"{TAG_FLD}.{fld}"
-                bqry.should.append(Q("rank_feature", field=fld, linear={}, boost=sc))
+            # -----------------------------
+            # FUSION WEIGHT
+            # -----------------------------
+            elif isinstance(m, FusionExpr):
+                if m.method == "weighted_sum" and "weights" in m.fusion_params:
+                    w = m.fusion_params["weights"].split(",")
+                    fusion_weight_vector = get_float(w[1])
 
-        if bqry:
-            s = s.query(bqry)
-        for field in highlightFields:
-            s = s.highlight(field)
+        # =====================================================================
+        # 3) Query 1 – Keyword search
+        # =====================================================================
+        keyword_hits = []
+        text_query = None
+        if text_query:
+            s_kw = Search()
+            kw_bool = Q("bool", must=[text_query])
+            kw_bool.must.append(filter_q)
 
-        if orderBy:
-            orders = list()
-            for field, order in orderBy.fields:
-                order = "asc" if order == 0 else "desc"
-                if field in ["page_num_int", "top_int"]:
-                    order_info = {"order": order, "unmapped_type": "float",
-                                  "mode": "avg", "numeric_type": "double"}
-                elif field.endswith("_int") or field.endswith("_flt"):
-                    order_info = {"order": order, "unmapped_type": "float"}
-                else:
-                    order_info = {"order": order, "unmapped_type": "text"}
-                orders.append({field: order_info})
-            s = s.sort(*orders)
+            s_kw = s_kw.query(kw_bool)
+            s_kw = s_kw[offset: offset + limit]  # apply pagination only here
 
-        for fld in aggFields:
-            s.aggs.bucket(f'aggs_{fld}', 'terms', field=fld, size=1000000)
+            # highlight chỉ áp dụng keyword search
+            for fld in highlightFields:
+                s_kw = s_kw.highlight(fld)
 
-        if limit > 0:
-            s = s[offset:offset + limit]
-        q = s.to_dict()
-        logger.debug(f"ESConnection.search {str(indexNames)} query: " + json.dumps(q))
-
-        for i in range(ATTEMPT_TIME):
+            q_kw = s_kw.to_dict()
             try:
-                print(json.dumps(q, ensure_ascii=False))
-                res = self.es.search(index=indexNames,
-                                     body=q,
-                                     timeout="600s",
-                                     # search_type="dfs_query_then_fetch",
-                                     track_total_hits=True,
-                                     _source=True)
-                if str(res.get("timed_out", "")).lower() == "true":
-                    raise Exception("Es Timeout.")
-                logger.debug(f"ESConnection.search {str(indexNames)} res: " + str(res))
-                return res
-            except ConnectionTimeout:
-                logger.exception("ES request timeout")
-                self._connect()
-                continue
+                res_kw = self.es.search(
+                    index=indexNames,
+                    body=q_kw,
+                    timeout="60s",
+                    track_total_hits=True
+                )
+                keyword_hits = res_kw["hits"]["hits"]
             except Exception as e:
-                logger.exception(f"ESConnection.search {str(indexNames)} query: " + str(q) + str(e))
-                raise e
+                logger.exception(f"Keyword search error: {e}")
+                keyword_hits = []
 
-        logger.error(f"ESConnection.search timeout for {ATTEMPT_TIME} times!")
-        raise Exception("ESConnection.search timeout.")
+        # =====================================================================
+        # 4) Query 2 – Semantic search (vector KNN)
+        # =====================================================================
+        semantic_hits = []
+        if vector_data is not None:
+            s_vec = Search()
+
+            s_vec = s_vec.knn(
+                field=vector_field,
+                k=topk,
+                num_candidates=num_candidates,
+                query_vector=vector_data,
+                filter=filter_q.to_dict()
+            )
+
+            q_vec = s_vec.to_dict()
+
+            try:
+                res_vec = self.es.search(
+                    index=indexNames,
+                    body=q_vec,
+                    timeout="60s",
+                    track_total_hits=False
+                )
+                semantic_hits = res_vec["hits"]["hits"]
+            except Exception as e:
+                logger.exception(f"Vector search error: {e}")
+                semantic_hits = []
+
+        # =====================================================================
+        # 5) Fusion → merge 2 lists + rerank
+        # =====================================================================
+        all_docs = {}
+
+        # Add keyword docs
+        for d in keyword_hits:
+            _id = d["_id"]
+            score = d["_score"] * (1.0 - fusion_weight_vector)
+            all_docs[_id] = {
+                "_id": _id,
+                "_source": d["_source"],
+                "_score": float(score),
+                "kw_score": float(d["_score"]),
+                "vec_score": 0.0
+            }
+
+        # Add vector docs
+        for d in semantic_hits:
+            _id = d["_id"]
+            score = d["_score"] * fusion_weight_vector
+            if _id in all_docs:
+                all_docs[_id]["_score"] += float(score)
+                all_docs[_id]["vec_score"] = float(d["_score"])
+            else:
+                all_docs[_id] = {
+                    "_id": _id,
+                    "_source": d["_source"],
+                    "_score": float(score),
+                    "kw_score": 0.0,
+                    "vec_score": float(d["_score"])
+                }
+
+        # sort by fused score
+        final_docs = sorted(all_docs.values(), key=lambda x: x["_score"], reverse=True)
+        final_docs = final_docs[:limit]
+
+        # Build ES-like response
+        return {
+            "hits": {
+                "total": len(final_docs),
+                "hits": [
+                    {
+                        "_id": d["_id"],
+                        "_score": d["_score"],
+                        "_source": d["_source"]
+                    }
+                    for d in final_docs
+                ]
+            }
+        }
+
 
     def get(self, chunkId: str, indexName: str, knowledgebaseIds: list[str]) -> dict | None:
         for i in range(ATTEMPT_TIME):

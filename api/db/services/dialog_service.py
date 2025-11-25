@@ -288,9 +288,13 @@ def classify_and_respond(dialog, messages, stream=True):
 
     prompt_config = dialog.prompt_config
     datetime_info = get_current_datetime_info()
-    # Combined system prompt: Classify + Respond
-    system_content = f"""{datetime_info}
+    # Combined system prompt: Classify + Respond with STRONG instruction
+   
+    system_content = f"""
+                    ## Context:\n{datetime_info}\n
+                    ## Role:\n
                     {prompt_config.get("system", "")}
+                    \n
                     {classify_and_respond_prompt()}"""
 
     tts_mdl = None
@@ -299,42 +303,54 @@ def classify_and_respond(dialog, messages, stream=True):
     
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     
+    # Add classification reminder to last user message
+    if msg and msg[-1]["role"] == "user":
+        msg[-1]["content"] = f"{msg[-1]['content']}\n\n[REMINDER: Start your response with [CLASSIFY:KB] or [CLASSIFY:GREET] or [CLASSIFY:SENSITIVE]]"
+    
     if stream:
         classify_type = None
         
-        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, dialog.llm_setting):            
-            # Extract classification from first chunk
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, dialog.llm_setting):
+            logging.info(f"[CLASSIFY_DEBUG] answer={answer[:200]}, classify_type={classify_type}")
+            
+            # Extract classification from first chunk - CHECK BEFORE YIELDING
             if classify_type is None:
                 if "[CLASSIFY:KB]" in answer:
                     classify_type = "KB"
+                    logging.info(f"[CLASSIFY_DEBUG] KB detected, yielding KB signal")
                     yield "KB"
                     return
                 elif "[CLASSIFY:GREET]" in answer:
                     classify_type = "GREET"
+                    logging.info(f"[CLASSIFY_DEBUG] GREET detected")
                 elif "[CLASSIFY:SENSITIVE]" in answer:
                     classify_type = "SENSITIVE"
+                    logging.info(f"[CLASSIFY_DEBUG] SENSITIVE detected")
+                
+                # If no classification detected yet, don't yield anything (wait for more chunks)
+                if classify_type is None:
+                    continue
             
             # Remove classification prefix for GREET/SENSITIVE
             if classify_type in ["GREET", "SENSITIVE"]:
                 answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
             
-            # Yield response (for GREET/SENSITIVE/fallback)
-            if classify_type in ["GREET", "SENSITIVE", None]:
+            # Yield response (for GREET/SENSITIVE only, skip None)
+            if classify_type in ["GREET", "SENSITIVE"]:
                 if is_final:
                     yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
                 else:
                     yield {"answer": answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time()}
         
-        # Ensure final response if nothing was yielded
-        if classify_type in ["GREET", "SENSITIVE"] and answer:
-            answer = answer.replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
-            if answer:  # Ensure we send at least the complete answer
-                logging.warning(f"[CLASSIFY_AND_RESPOND] Final yield (complete): {answer[:50]}...")
-                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
-        elif classify_type is None and answer:
+        # Final response handling
+        if classify_type in ["GREET", "SENSITIVE"]:
+            # Already handled in loop above
+            pass
+        elif classify_type is None:
             # Fallback: LLM didn't return proper format, yield directly
-            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected. Answer: {answer[:100]}...")
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected after all chunks. Answer: {answer[:100] if 'answer' in locals() else 'N/A'}...")
+            if 'answer' in locals() and answer:
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
     else:
         answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
@@ -1045,7 +1061,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
     
    
-    if len(questions) > 1 :
+    if len(questions) > 1 and prompt_config.get("refine_multiturn"):
         questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]

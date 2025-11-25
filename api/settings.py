@@ -20,6 +20,7 @@ from datetime import date
 
 import rag.utils
 import rag.utils.es_conn
+import rag.utils.es_conn_v1
 import rag.utils.infinity_conn
 import rag.utils.opensearch_conn
 from api.constants import RAG_FLOW_SERVICE_NAME
@@ -174,7 +175,8 @@ def init_settings():
     # DOC_ENGINE = os.environ.get('DOC_ENGINE', "opensearch")
     lower_case_doc_engine = DOC_ENGINE.lower()
     if lower_case_doc_engine == "elasticsearch":
-        docStoreConn = rag.utils.es_conn.ESConnection()
+        #docStoreConn = rag.utils.es_conn.ESConnection()
+        docStoreConn = rag.utils.es_conn_v1.ESConnectionV1()
     elif lower_case_doc_engine == "infinity":
         docStoreConn = rag.utils.infinity_conn.InfinityConnection()
     elif lower_case_doc_engine == "opensearch":
