@@ -242,7 +242,6 @@ class ESConnectionV1(DocStoreConnection):
         # 3) Query 1 – Keyword search
         # =====================================================================
         keyword_hits = []
-        text_query = None
         if text_query:
             s_kw = Search()
             kw_bool = Q("bool", must=[text_query])
