@@ -211,9 +211,13 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
 
     if stream:
         try:
+            chunk_count = 0
             for ans in chat_func(dia, msg, True, **kwargs):
+                chunk_count += 1
+                logging.info(f"[COMPLETION] Received chunk #{chunk_count} from chat_func")
                 ans = structure_answer(conv, ans, message_id, session_id, memory)
                 yield "data:" + json.dumps({"code": 0, "data": ans}, ensure_ascii=False) + "\n\n"
+            logging.info(f"[COMPLETION] Stream completed with {chunk_count} total chunks")
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
             # Write-through cache: Update cache with new message instead of invalidating

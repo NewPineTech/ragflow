@@ -1250,13 +1250,22 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
         system_parts.append(f"\n## Knowledge:\n{kwargs['knowledge']}")
     
-    # Add instruction to avoid repeating the question
+    # Add instruction based on whether initial response exists
     if kb_initial_response:
         system_parts.append(f"\n## Assistant had already answered:\n{kb_initial_response}")
-    
-    system_parts.append("""
+        system_parts.append("""
      \n## IMPORTANT:
-     - Answer the question directly using the knowledge provided
+    - The assistant has ALREADY provided an initial answer above
+    - DO NOT repeat or rephrase what was already said
+    - CONTINUE from where the initial answer left off
+    - Add MORE DETAILS, examples, or elaboration using the Knowledge provided
+    - If the initial answer is complete and Knowledge adds nothing new, just acknowledge briefly
+    - DO NOT start over or repeat the same information
+    - Keep the flow natural and conversational""")
+    else:
+        system_parts.append("""
+     \n## IMPORTANT:
+    - Answer the question directly using the knowledge provided
     - DO NOT repeat or rephrase the user's question
     - DO NOT ask confirmation like 'you want to know about X, right?'
     - DO NOT use unnecessary opening phrases like 'I understand', 'Great question'
