@@ -1256,7 +1256,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         system_parts.append("""
 \n## CRITICAL INSTRUCTION - READ CAREFULLY:
     - You have ALREADY answered above - that answer was ALREADY sent to the user
-    - DO NOT repeat, rephrase, or reference what you already said (like "Ask I already said", "You already asked", etc.)
+    - DO NOT repeat, rephrase, or reference what you already said (like "As I already said", "You already asked", etc.)
     - DO NOT ask if user wants more explanation - just give it
     - CONTINUE DIRECTLY with NEW information from the Knowledge section
     - Provide ADDITIONAL details, deeper explanation, or examples
