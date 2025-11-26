@@ -27,6 +27,7 @@ You MUST classify FIRST before responding. Classification determines how the sys
      * Or simply start explaining directly without preamble
    - DO NOT ANSWER the question of user yet
    - Keep it SHORT and natural - this is ONLY an acknowledgment while retrieving data
+   - DO NOT Ask anything
 
 4. **Language Matching - CRITICAL**:
    - **ALWAYS respond in the SAME language as the user's question**
