@@ -309,7 +309,11 @@ def classify_and_respond(dialog, messages, stream=True):
     if stream:
         classify_type = None
         
-        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, dialog.llm_setting):
+        # 🎯 Limit max_tokens for classification to prevent long responses
+        classify_gen_conf = dialog.llm_setting.copy()
+        classify_gen_conf["max_tokens"] = 50  # Only allow short acknowledgment
+        
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, classify_gen_conf):
             logging.info(f"[CLASSIFY_DEBUG] answer={answer[:200]}, classify_type={classify_type}, is_final={is_final}")
             
             # Extract classification from first chunk
@@ -1255,15 +1259,30 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         system_parts.append(f"\n## What you already said to user:\n{kb_initial_response}")
         system_parts.append("""
 \n## CRITICAL INSTRUCTION - READ CAREFULLY:
-    - You have ALREADY answered above - that answer was ALREADY sent to the user
-    - DO NOT repeat, rephrase, or reference what you already said (like "As I already said", "You already asked", etc.)
-    - DO NOT ask if user wants more explanation - just give it
-    - CONTINUE DIRECTLY with NEW information from the Knowledge section
-    - Provide ADDITIONAL details, deeper explanation, or examples
-    - If Knowledge has nothing new to add, give a brief relevant elaboration or context
-    - Write as if continuing a natural conversation, NOT starting over
-    - DO NOT use searching phrases like 'Let me explain', 'Let me search', 'I found the following information', 'let me share'
-    - Answer the question directly using the knowledge provided""")
+    - You have ALREADY sent the above message to user - they have seen it
+    - DO NOT repeat ANY part of what you already said
+    
+    ❌ FORBIDDEN phrases (DO NOT use these):
+    - "Con đã hiểu về [topic]..." (Don't say user understood)
+    - "Như Thầy đã nói..." (Don't reference what you said)
+    - "Con đã hỏi về..." (Don't repeat the question)
+    - "Con hỏi rất hay..." / "Câu hỏi hay..." (Don't compliment the question here - that was in initial response)
+    - "You already know..." / "As you know..." (Don't assume user knows)
+    - "I already explained..." / "As I mentioned..." (Don't refer back)
+    
+    ✅ CORRECT approach:
+    - Start DIRECTLY with NEW information from Knowledge
+    - Expand with details, examples, context not mentioned before
+    - If Knowledge repeats what you said, add depth/nuance/related concepts
+    - Write as if you're naturally continuing, not summarizing what was said
+    
+    Example:
+    - Already said: "Về giới thứ nhất, Thầy sẽ giảng giải cho Con."
+    - Knowledge: "Giới thứ nhất là không sát sinh..."
+    - ❌ WRONG: "Con đã hiểu về giới thứ nhất là không sát sinh. Giới này..."
+    - ✅ CORRECT: "Giới này là không sát sinh. Sát sinh có nghĩa là..."
+    
+    START your answer DIRECTLY with the information, NOT with meta-commentary about what was said before.""")
     else:
         system_parts.append("""
 \n## IMPORTANT:
