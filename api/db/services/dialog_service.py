@@ -45,7 +45,7 @@ from graphrag.general.mind_map_extractor import MindMapExtractor
 from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
-from rag.prompts.generator import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
+from rag.prompts.generator import after_classify_and_acknowledge_prompt, chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
      gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, classify_and_respond_prompt
 from common.token_utils import num_tokens_from_string
 from rag.utils.tavily_conn import Tavily
@@ -1257,43 +1257,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     # Add instruction based on whether initial response exists
     if kb_initial_response:
         system_parts.append(f"\n## What you already said to user:\n{kb_initial_response}")
-        system_parts.append("""
-\n## CRITICAL INSTRUCTION - READ CAREFULLY:
-    - You have ALREADY sent the above message to user - they have seen it
-    - DO NOT repeat ANY part of what you already said
-    
-    ❌ FORBIDDEN phrases (DO NOT use these):
-    - "Con đã hiểu về [topic]..." (Don't say user understood)
-    - "Như Thầy đã nói..." (Don't reference what you said)
-    - "Con đã hỏi về..." (Don't repeat the question)
-    - "Con hỏi rất hay..." / "Câu hỏi hay..." (Don't compliment the question here - that was in initial response)
-    - "You already know..." / "As you know..." (Don't assume user knows)
-    - "I already explained..." / "As I mentioned..." (Don't refer back)
-    
-    ✅ CORRECT approach:
-    - Start DIRECTLY with NEW information from Knowledge
-    - Expand with details, examples, context not mentioned before
-    - If Knowledge repeats what you said, add depth/nuance/related concepts
-    - Write as if you're naturally continuing, not summarizing what was said
-    
-    Example:
-    - Already said: "Về giới thứ nhất, Thầy sẽ giảng giải cho Con."
-    - Knowledge: "Giới thứ nhất là không sát sinh..."
-    - ❌ WRONG: "Con đã hiểu về giới thứ nhất là không sát sinh. Giới này..."
-    - ✅ CORRECT: "Giới này là không sát sinh. Sát sinh có nghĩa là..."
-    
-    START your answer DIRECTLY with the information, NOT with meta-commentary about what was said before.""")
-    else:
-        system_parts.append("""
-\n## IMPORTANT:
-    - Answer the question directly using the knowledge provided
-    - DO NOT repeat or rephrase the user's question
-    - DO NOT ask confirmation like 'you want to know about X, right?'
-    - DO NOT use unnecessary opening phrases like 'I understand', 'Great question'
-    - DO NOT use searching phrases like 'Let me explain', 'Let me search', 'I found the following information', 'let me share'
-    - Just provide the answer directly, naturally and concisely
-    - Start directly with the information requested
-    - Answer at least 2 sentences if possible""")
+        system_parts.append(f"\n{after_classify_and_acknowledge_prompt()}\n")
     
     # Single system message for better LLM compatibility
     msg = [{"role": "system", "content": "".join(system_parts)}]

@@ -162,6 +162,9 @@ QUESTION_CLASSIFY_TEMPLATE = load_prompt("question_classify")
 BEGIN_ANSWER_TEMPLATE = load_prompt("begin_answer")
 MEMORY_PROMPT = load_prompt("short_term_memory_prompt")
 CLASSIFY_AND_RESPOND_TEMPLATE = load_prompt("classify_and_respond")
+AFTER_ACKNOWLEDGE_QUERY_TEMPLATE = load_prompt("after_acknowledge_query")
+
+
 
 PROMPT_JINJA_ENV = jinja2.Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
 
@@ -892,4 +895,8 @@ def relevant_chunks_with_toc(query: str, toc:list[dict], chat_mdl, topn: int=6):
 
 def classify_and_respond_prompt():
     template = PROMPT_JINJA_ENV.from_string(CLASSIFY_AND_RESPOND_TEMPLATE)
+    return template.render()
+
+def after_classify_and_acknowledge_prompt():
+    template = PROMPT_JINJA_ENV.from_string(AFTER_ACKNOWLEDGE_QUERY_TEMPLATE)
     return template.render()
