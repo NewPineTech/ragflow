@@ -123,11 +123,19 @@ def register_page(page_path):
     spec.loader.exec_module(page)
     page_name = getattr(page, "page_name", page_name)
     sdk_path = "\\sdk\\" if sys.platform.startswith("win") else "/sdk/"
-    url_prefix = (
-        f"/api/{API_VERSION}" if sdk_path in path else f"/{API_VERSION}/{page_name}"
-    )
+    
+    # Determine URL prefix
+    if sdk_path in path:
+        # SDK files get /api/v1 prefix
+        url_prefix = f"/api/{API_VERSION}"
+    elif page_name in ["api"]:
+        url_prefix = f"/api/{API_VERSION}/{page_name}"
+    else:
+        # Other files get /v1/{page_name}
+        url_prefix = f"/{API_VERSION}/{page_name}"
 
     app.register_blueprint(page.manager, url_prefix=url_prefix)
+    logging.info(f"[BLUEPRINT] Registered {page_name} at {url_prefix}")
     return url_prefix
 
 

@@ -4237,4 +4237,256 @@ Content-Type: application/json
 Explanation:  
 - Each service is reported as "ok" or "nok".  
 - The top-level `status` reflects overall health.  
-- If any service is "nok", detailed error info appears in `_meta`.  
+- If any service is "nok", detailed error info appears in `_meta`.
+
+---
+
+## LLM Configuration APIs
+
+---
+
+### Get available chat models
+
+**GET** `/api/v1/chat_models`
+
+Retrieves a list of available chat models that can be configured in dialogs. Only returns models that have been configured with valid API keys.
+
+#### Request
+
+- Method: GET
+- URL: `/api/v1/chat_models`
+- Headers:
+  - `'Authorization: Bearer <YOUR_API_KEY>'`
+
+##### Request example
+
+```bash
+curl --request GET \
+     --url http://{address}/api/v1/chat_models \
+     --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+#### Response
+
+##### Response example
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "llm_id": "OpenAI@gpt-4",
+      "llm_factory": "OpenAI",
+      "llm_name": "gpt-4",
+      "model_type": "chat",
+      "max_tokens": 8192,
+      "api_base": "https://api.openai.com/v1"
+    },
+    {
+      "llm_id": "Anthropic@claude-3-opus-20240229",
+      "llm_factory": "Anthropic",
+      "llm_name": "claude-3-opus-20240229",
+      "model_type": "chat",
+      "max_tokens": 4096,
+      "api_base": ""
+    }
+  ]
+}
+```
+
+##### Response parameters
+
+- `code`: `integer`  
+  Status code. `0` indicates success.
+
+- `data`: `array`  
+  List of available chat models.
+  - `llm_id`: `string` - Unique identifier in format `{factory}@{model_name}`
+  - `llm_factory`: `string` - LLM provider name (e.g., "OpenAI", "Anthropic")
+  - `llm_name`: `string` - Model name
+  - `model_type`: `string` - Always "chat" for this endpoint
+  - `max_tokens`: `integer` - Maximum tokens supported by the model
+  - `api_base`: `string` - API base URL (empty string if using default)
+
+---
+
+### Get available rerank models
+
+**GET** `/api/v1/rerank_models`
+
+Retrieves a list of available rerank models that can be configured in dialogs. Only returns models that have been configured with valid API keys.
+
+#### Request
+
+- Method: GET
+- URL: `/api/v1/rerank_models`
+- Headers:
+  - `'Authorization: Bearer <YOUR_API_KEY>'`
+
+##### Request example
+
+```bash
+curl --request GET \
+     --url http://{address}/api/v1/rerank_models \
+     --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+#### Response
+
+##### Response example
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "rerank_id": "Cohere@rerank-english-v2.0",
+      "llm_factory": "Cohere",
+      "llm_name": "rerank-english-v2.0",
+      "model_type": "rerank",
+      "api_base": ""
+    },
+    {
+      "rerank_id": "Jina@jina-reranker-v1-base-en",
+      "llm_factory": "Jina",
+      "llm_name": "jina-reranker-v1-base-en",
+      "model_type": "rerank",
+      "api_base": "https://api.jina.ai/v1"
+    }
+  ]
+}
+```
+
+##### Response parameters
+
+- `code`: `integer`  
+  Status code. `0` indicates success.
+
+- `data`: `array`  
+  List of available rerank models.
+  - `rerank_id`: `string` - Unique identifier in format `{factory}@{model_name}`
+  - `llm_factory`: `string` - Rerank provider name (e.g., "Cohere", "Jina")
+  - `llm_name`: `string` - Model name
+  - `model_type`: `string` - Always "rerank" for this endpoint
+  - `api_base`: `string` - API base URL (empty string if using default)
+
+---
+
+### Get supported languages
+
+**GET** `/api/v1/languages`
+
+Retrieves a list of supported languages for dialog configuration. This list includes language codes and display names.
+
+#### Request
+
+- Method: GET
+- URL: `/api/v1/languages`
+- Headers:
+  - `'Authorization: Bearer <YOUR_API_KEY>'`
+
+##### Request example
+
+```bash
+curl --request GET \
+     --url http://{address}/api/v1/languages \
+     --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+#### Response
+
+##### Response example
+
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "vi",
+      "name": "Tiếng Việt"
+    },
+    {
+      "code": "zh",
+      "name": "中文"
+    },
+    {
+      "code": "ja",
+      "name": "日本語"
+    },
+    {
+      "code": "ko",
+      "name": "한국어"
+    },
+    {
+      "code": "es",
+      "name": "Español"
+    },
+    {
+      "code": "fr",
+      "name": "Français"
+    },
+    {
+      "code": "de",
+      "name": "Deutsch"
+    },
+    {
+      "code": "ru",
+      "name": "Русский"
+    },
+    {
+      "code": "ar",
+      "name": "العربية"
+    },
+    {
+      "code": "pt",
+      "name": "Português"
+    },
+    {
+      "code": "it",
+      "name": "Italiano"
+    },
+    {
+      "code": "nl",
+      "name": "Nederlands"
+    },
+    {
+      "code": "pl",
+      "name": "Polski"
+    },
+    {
+      "code": "tr",
+      "name": "Türkçe"
+    },
+    {
+      "code": "th",
+      "name": "ไทย"
+    },
+    {
+      "code": "id",
+      "name": "Bahasa Indonesia"
+    },
+    {
+      "code": "ms",
+      "name": "Bahasa Melayu"
+    },
+    {
+      "code": "hi",
+      "name": "हिन्दी"
+    }
+  ]
+}
+```
+
+##### Response parameters
+
+- `code`: `integer`  
+  Status code. `0` indicates success.
+
+- `data`: `array`  
+  List of supported languages.
+  - `code`: `string` - ISO 639-1 language code (e.g., "en", "vi", "zh")
+  - `name`: `string` - Display name in the native language  
