@@ -76,7 +76,7 @@ def get_chat_models(tenant_id):
         for o in objs:
             if o.status == StatusEnum.VALID.value and o.api_key:
                 result.append({
-                    "llm_id": f"{o.llm_factory}@{o.llm_name}",
+                    "llm_id": f"{o.llm_name}@{o.llm_factory}",
                     "llm_factory": o.llm_factory,
                     "llm_name": o.llm_name,
                     "model_type": o.model_type,
@@ -142,7 +142,7 @@ def get_rerank_models(tenant_id):
         for o in objs:
             if o.status == StatusEnum.VALID.value and o.api_key:
                 result.append({
-                    "llm_id": f"{o.llm_factory}@{o.llm_name}",
+                    "llm_id": f"{o.llm_name}@{o.llm_factory}",
                     "llm_factory": o.llm_factory,
                     "llm_name": o.llm_name,
                     "model_type": o.model_type,

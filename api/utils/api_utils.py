@@ -23,6 +23,7 @@ from copy import deepcopy
 from functools import wraps
 
 import requests
+from rag.utils.redis_conn import REDIS_CONN
 import trio
 from flask import (
     Response,
@@ -85,6 +86,12 @@ def get_data_error_result(code=RetCode.DATA_ERROR, message="Sorry! Data missing!
 
 
 def server_error_response(e):
+    # Skip logging for werkzeug HTTPException (let Flask handle them)
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        # Return the HTTPException response as-is without logging
+        return e
+    
     logging.exception(e)
     try:
         msg = repr(e).lower()
@@ -211,9 +218,17 @@ def token_required(func):
         if len(authorization_list) < 2:
             return get_json_result(data=False, message="Please check your authorization format.")
         token = authorization_list[1]
+
+        cached_tenant = REDIS_CONN.get(f"api_token:{token}")
+        if cached_tenant:
+            kwargs["tenant_id"] = cached_tenant
+            return func(*args, **kwargs)
+
         objs = APIToken.query(token=token)
         if not objs:
             return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
+        if objs:
+            REDIS_CONN.set(f"api_token:{token}", objs[0].tenant_id, exp=300)
         kwargs["tenant_id"] = objs[0].tenant_id
         return func(*args, **kwargs)
 
