@@ -48,7 +48,7 @@ def _normalize_query(query: str) -> str:
     # 7. Join lại
     return ' '.join(words)
 
-def _make_cache_key(func_name, query, kb_ids, top_k, **kwargs):
+def _make_cache_key(func_name, query, kb_ids, top_k, similarity_threshold=None, vector_similarity_weight=None, **kwargs):
     """Generate cache key from function parameters"""
     # Sort kb_ids để đảm bảo cache key giống nhau cho cùng KB set
     kb_ids_sorted = sorted(kb_ids) if isinstance(kb_ids, list) else kb_ids
@@ -56,14 +56,24 @@ def _make_cache_key(func_name, query, kb_ids, top_k, **kwargs):
     # Normalize query để tăng cache hit
     normalized_query = _normalize_query(query)
     
+    # Extract critical similarity parameters that affect results
+    # Try to get from explicit params first, then from kwargs, then use defaults
+    if similarity_threshold is None:
+        similarity_threshold = kwargs.get("similarity_threshold", 0.2)
+    if vector_similarity_weight is None:
+        vector_similarity_weight = kwargs.get("vector_similarity_weight", 0.3)
+    
     base = {
         "func": func_name,
         "query": normalized_query,
         "kb_ids": kb_ids_sorted,
         "top_k": top_k,
-        # Chỉ cache những params quan trọng, skip models
+        # Include similarity parameters in cache key
+        "similarity_threshold": similarity_threshold,
+        "vector_similarity_weight": vector_similarity_weight,
+        # Chỉ cache những params quan trọng khác, skip models và các params đã extract
         "extra": {k: kwargs.get(k) for k in sorted(kwargs.keys()) 
-                 if k not in ["embd_mdl", "rerank_mdl", "self"]}
+                 if k not in ["embd_mdl", "rerank_mdl", "self", "similarity_threshold", "vector_similarity_weight"]}
     }
     cache_str = json.dumps(base, sort_keys=True, ensure_ascii=False)
     return f"kb_retrieval:{hashlib.md5(cache_str.encode()).hexdigest()}"
@@ -130,14 +140,23 @@ def cache_retrieval(ttl: int = 60):
             if len(args) > 0 and hasattr(args[0], '__dict__'):
                 start_idx = 1  # Skip self
             
+            # Parse args based on retrieval() signature:
+            # def retrieval(self, question, embd_mdl, tenant_ids, kb_ids, page, page_size, similarity_threshold=0.2,
+            #               vector_similarity_weight=0.3, top=1024, doc_ids=None, aggs=True, ...)
             query = args[start_idx] if len(args) > start_idx else kwargs.get("question", kwargs.get("query", ""))
-            kb_ids = kwargs.get("kb_ids", [])
-            top_k = kwargs.get("top", 5)
+            kb_ids = args[start_idx + 3] if len(args) > start_idx + 3 else kwargs.get("kb_ids", [])
+            
+            # Get similarity params from args if available (positional args at index 6 and 7 after self)
+            similarity_threshold = args[start_idx + 6] if len(args) > start_idx + 6 else kwargs.get("similarity_threshold", 0.2)
+            vector_similarity_weight = args[start_idx + 7] if len(args) > start_idx + 7 else kwargs.get("vector_similarity_weight", 0.3)
+            top_k = args[start_idx + 8] if len(args) > start_idx + 8 else kwargs.get("top", 5)
             
             # Generate cache key
-            cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, **kwargs)
+            cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, 
+                                       similarity_threshold, vector_similarity_weight, **kwargs)
             
-            #print(f"[CACHE] Key: {cache_key[:16]}... for query: {str(query)[:50]}...")
+            print(f"[CACHE] Key: {cache_key}... for query: {str(query)[:50]}...")
+            print(f"[CACHE] Params: similarity_threshold={similarity_threshold}, vector_weight={vector_similarity_weight}")
 
             # 1️⃣ Kiểm tra Redis cache
             if REDIS_CONN:
@@ -146,7 +165,7 @@ def cache_retrieval(ttl: int = 60):
                     if data:
                         result = json.loads(data)
                         result["_cached"] = True
-                        #print(f"[CACHE] ✓ HIT from Redis for {func.__name__}")
+                        print(f"[CACHE] ✓ HIT from Redis for {func.__name__}")
                         return result
                 except Exception as e:
                     print(f"[CACHE] Redis read error: {e}")
@@ -156,14 +175,14 @@ def cache_retrieval(ttl: int = 60):
                 result, ts = _cache_memory[cache_key]
                 if time.time() - ts < ttl:
                     result["_cached"] = True
-                    #print(f"[CACHE] ✓ HIT from memory for {func.__name__}")
+                    print(f"[CACHE] ✓ HIT from memory for {func.__name__}")
                     return result
                 else:
                     # Expired, remove it
                     del _cache_memory[cache_key]
 
             # 3️⃣ Cache MISS - chạy function thật
-            #print(f"[CACHE] MISS - executing {func.__name__}")
+            print(f"[CACHE] MISS - executing {func.__name__}")
             start_time = time.time()
             result = func(*args, **kwargs)
             elapsed = time.time() - start_time

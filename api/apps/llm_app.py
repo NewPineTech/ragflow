@@ -371,3 +371,4 @@ def list_app():
         return get_json_result(data=res)
     except Exception as e:
         return server_error_response(e)
+
