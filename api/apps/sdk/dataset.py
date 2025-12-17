@@ -470,6 +470,9 @@ def list_datasets(tenant_id):
 
         response_data_list = []
         for kb in kbs:
+            # Get actual document count from database
+            actual_doc_count = DocumentService.query(kb_id=kb['id']).count()
+            kb['doc_num'] = actual_doc_count
             response_data_list.append(remap_dictionary_keys(kb))
         return get_result(data=response_data_list, total=total)
     except OperationalError as e:
