@@ -99,6 +99,18 @@ request.interceptors.request.use((url: string, options: any) => {
 });
 
 request.interceptors.response.use(async (response: Response, options) => {
+  // Check HTTP status 401 first (unauthorized)
+  if (response?.status === 401) {
+    notification.error({
+      message: i18n.t('message.401'),
+      description: i18n.t('message.401'),
+      duration: 3,
+    });
+    authorizationUtil.removeAll();
+    redirectToLogin();
+    return response;
+  }
+
   if (response?.status === 413 || response?.status === 504) {
     message.error(RetcodeMessage[response?.status as ResultCode]);
   }
@@ -111,6 +123,7 @@ request.interceptors.response.use(async (response: Response, options) => {
   if (data?.code === 100) {
     message.error(data?.message);
   } else if (data?.code === 401) {
+    // Handle 401 in response body as well
     notification.error({
       message: data?.message,
       description: data?.message,

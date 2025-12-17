@@ -694,6 +694,70 @@ def delete(tenant_id, dataset_id):
     return get_result()
 
 
+@manager.route("/datasets/<dataset_id>/documents/stats", methods=["GET"])  # noqa: F821
+@token_required
+def get_document_stats(tenant_id, dataset_id):
+    """
+    Get document statistics for a dataset.
+    ---
+    tags:
+      - Documents
+    security:
+      - ApiKeyAuth: []
+    parameters:
+      - in: path
+        name: dataset_id
+        type: string
+        required: true
+        description: ID of the dataset.
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: Bearer token for authentication.
+    responses:
+      200:
+        description: Document statistics.
+        schema:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Total number of documents.
+            done:
+              type: integer
+              description: Number of documents with status DONE.
+            pending:
+              type: integer
+              description: Number of documents not yet processed (UNSTART, RUNNING, CANCEL, FAIL).
+            active:
+              type: integer
+              description: Number of active documents (status=1).
+            inactive:
+              type: integer
+              description: Number of inactive documents (status=0).
+    """
+    if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
+        return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
+    
+    # Get all documents in the dataset
+    all_docs = DocumentService.query(kb_id=dataset_id)
+    
+    total = len(all_docs)
+    done = sum(1 for doc in all_docs if str(doc.run) == "3")  # DONE status
+    pending = total - done  # All other statuses (UNSTART, RUNNING, CANCEL, FAIL)
+    active = sum(1 for doc in all_docs if str(doc.status) == "1")  # Active status
+    inactive = sum(1 for doc in all_docs if str(doc.status) == "0")  # Inactive status
+    
+    return get_result(data={
+        "total": total,
+        "done": done,
+        "pending": pending,
+        "active": active,
+        "inactive": inactive
+    })
+
+
 @manager.route("/datasets/<dataset_id>/chunks", methods=["POST"])  # noqa: F821
 @token_required
 def parse(tenant_id, dataset_id):
