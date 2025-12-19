@@ -18,7 +18,7 @@ from enum import Enum, IntEnum
 from strenum import StrEnum
 
 SERVICE_CONF = "service_conf.yaml"
-
+RAG_FLOW_SERVICE_NAME = "ragflow"
 
 class CustomEnum(Enum):
     @classmethod
@@ -49,6 +49,7 @@ class RetCode(IntEnum, CustomEnum):
     RUNNING = 106
     PERMISSION_ERROR = 108
     AUTHENTICATION_ERROR = 109
+    BAD_REQUEST = 400
     UNAUTHORIZED = 401
     SERVER_ERROR = 500
     FORBIDDEN = 403
@@ -72,6 +73,7 @@ class LLMType(StrEnum):
     IMAGE2TEXT = 'image2text'
     RERANK = 'rerank'
     TTS = 'tts'
+    OCR = 'ocr'
 
 
 class TaskStatus(StrEnum):
@@ -113,12 +115,15 @@ class FileSource(StrEnum):
     DISCORD = "discord"
     CONFLUENCE = "confluence"
     GMAIL = "gmail"
-    GOOGLE_DRIVER = "google_driver"
+    GOOGLE_DRIVE = "google_drive"
     JIRA = "jira"
     SHAREPOINT = "sharepoint"
     SLACK = "slack"
     TEAMS = "teams"
-
+    WEBDAV = "webdav"
+    MOODLE = "moodle"
+    DROPBOX = "dropbox"
+    BOX = "box"
 
 class PipelineTaskType(StrEnum):
     PARSE = "Parse"
@@ -136,6 +141,32 @@ class MCPServerType(StrEnum):
     STREAMABLE_HTTP = "streamable-http"
 
 VALID_MCP_SERVER_TYPES = {MCPServerType.SSE, MCPServerType.STREAMABLE_HTTP}
+
+class Storage(Enum):
+    MINIO = 1
+    AZURE_SPN = 2
+    AZURE_SAS = 3
+    AWS_S3 = 4
+    OSS = 5
+    OPENDAL = 6
+    GCS = 7
+
+
+class MemoryType(Enum):
+    RAW = 0b0001          # 1 << 0 = 1 (0b00000001)
+    SEMANTIC = 0b0010     # 1 << 1 = 2 (0b00000010)
+    EPISODIC = 0b0100     # 1 << 2 = 4 (0b00000100)
+    PROCEDURAL = 0b1000   # 1 << 3 = 8 (0b00001000)
+
+
+class MemoryStorageType(StrEnum):
+    TABLE = "table"
+    GRAPH = "graph"
+
+
+class ForgettingPolicy(StrEnum):
+    FIFO = "fifo"
+
 
 # environment
 # ENV_STRONG_TEST_COUNT = "STRONG_TEST_COUNT"
@@ -181,3 +212,18 @@ VALID_MCP_SERVER_TYPES = {MCPServerType.SSE, MCPServerType.STREAMABLE_HTTP}
 # ENV_MAX_CONCURRENT_MINIO = "MAX_CONCURRENT_MINIO"
 # ENV_WORKER_HEARTBEAT_TIMEOUT = "WORKER_HEARTBEAT_TIMEOUT"
 # ENV_TRACE_MALLOC_ENABLED = "TRACE_MALLOC_ENABLED"
+
+PAGERANK_FLD = "pagerank_fea"
+SVR_QUEUE_NAME = "rag_flow_svr_queue"
+SVR_CONSUMER_GROUP_NAME = "rag_flow_svr_task_broker"
+TAG_FLD = "tag_feas"
+
+
+MINERU_ENV_KEYS = ["MINERU_APISERVER", "MINERU_OUTPUT_DIR", "MINERU_BACKEND", "MINERU_SERVER_URL", "MINERU_DELETE_OUTPUT"]
+MINERU_DEFAULT_CONFIG = {
+    "MINERU_APISERVER": "",
+    "MINERU_OUTPUT_DIR": "",
+    "MINERU_BACKEND": "pipeline",
+    "MINERU_SERVER_URL": "",
+    "MINERU_DELETE_OUTPUT": 1,
+}
