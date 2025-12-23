@@ -14,15 +14,17 @@
 #  limitations under the License.
 #
 import json
+import os
 import re
 import traceback
 import logging
 from copy import deepcopy
-from flask import Response, request
-from flask_login import current_user, login_required
+import tempfile
+from quart import Response, request
+from api.apps import current_user, login_required
 from api.db.db_models import APIToken
 from api.db.services.conversation_service import ConversationService, structure_answer
-from api.db.services.dialog_service import DialogService, ask, chat, gen_mindmap, chatv1
+from api.db.services.dialog_service import DialogService, async_ask, async_chat, gen_mindmap, chatv1
 from api.db.services.llm_service import LLMBundle
 from api.db.services.search_service import SearchService
 from api.db.services.tenant_llm_service import TenantLLMService
@@ -40,12 +42,12 @@ import time
 
 
 use_v1 = True
-chat_func = chatv1 if use_v1 else chat
+async_chat_func = async_chatv1 if use_v1 else async_chat
 
 @manager.route("/set", methods=["POST"])  # noqa: F821
 @login_required
-def set_conversation():
-    req = request.json
+async def set_conversation():
+    req = await get_request_json()
     conv_id = req.get("conversation_id")
     is_new = req.get("is_new")
     name = req.get("name", "New conversation")
@@ -88,14 +90,13 @@ def set_conversation():
 
 @manager.route("/get", methods=["GET"])  # noqa: F821
 @login_required
-def get():
+async def get():
     conv_id = request.args["conversation_id"]
     try:
         e, conv = ConversationService.get_by_id(conv_id)
         if not e:
             return get_data_error_result(message="Conversation not found!")
         tenants = UserTenantService.query(user_id=current_user.id)
-        avatar = None
         for tenant in tenants:
             dialog = DialogService.query(tenant_id=tenant.tenant_id, id=conv.dialog_id)
             if dialog and len(dialog) > 0:
@@ -139,8 +140,9 @@ def getsse(dialog_id):
 
 @manager.route("/rm", methods=["POST"])  # noqa: F821
 @login_required
-def rm():
-    conv_ids = request.json["conversation_ids"]
+async def rm():
+    req = await get_request_json()
+    conv_ids = req["conversation_ids"]
     try:
         for cid in conv_ids:
             exist, conv = ConversationService.get_by_id(cid)
@@ -160,7 +162,7 @@ def rm():
 
 @manager.route("/list", methods=["GET"])  # noqa: F821
 @login_required
-def list_conversation():
+async def list_conversation():
     dialog_id = request.args["dialog_id"]
     try:
         if not DialogService.query(tenant_id=current_user.id, id=dialog_id):
@@ -176,8 +178,8 @@ def list_conversation():
 @manager.route("/completion", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("conversation_id", "messages")
-def completion():
-    req = request.json
+async def completion():
+    req = await get_request_json()
     msg = []
     for m in req["messages"]:
         if m["role"] == "system":
@@ -280,10 +282,10 @@ def completion():
             dia.llm_setting = chat_model_config
 
         is_embedded = bool(chat_model_id)
-        def stream():
+        async def stream():
             nonlocal dia, msg, req, conv, conversation_id, memory
             try:
-                for ans in chat_func(dia, msg, True, **req):
+                async for ans in async_chat(dia, msg, True, **req):
                     ans = structure_answer(conv, ans, message_id, conv.id, memory)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
                 
@@ -316,7 +318,7 @@ def completion():
 
         else:
             answer = None
-            for ans in chat_func(dia, msg, **req):
+            async for ans in async_chat_func(dia, msg, **req):
                 answer = structure_answer(conv, ans, message_id, conv.id, memory)
                 if not is_embedded:
                     ConversationService.update_by_id(conv.id, conv.to_dict())
@@ -337,11 +339,69 @@ def completion():
     except Exception as e:
         return server_error_response(e)
 
+@manager.route("/sequence2txt", methods=["POST"])  # noqa: F821
+@login_required
+async def sequence2txt():
+    req = await request.form
+    stream_mode = req.get("stream", "false").lower() == "true"
+    files = await request.files
+    if "file" not in files:
+        return get_data_error_result(message="Missing 'file' in multipart form-data")
+
+    uploaded = files["file"]
+
+    ALLOWED_EXTS = {
+        ".wav", ".mp3", ".m4a", ".aac",
+        ".flac", ".ogg", ".webm",
+        ".opus", ".wma"
+    }
+
+    filename = uploaded.filename or ""
+    suffix = os.path.splitext(filename)[-1].lower()
+    if suffix not in ALLOWED_EXTS:
+        return get_data_error_result(message=
+            f"Unsupported audio format: {suffix}. "
+            f"Allowed: {', '.join(sorted(ALLOWED_EXTS))}"
+        )
+    fd, temp_audio_path = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
+    await uploaded.save(temp_audio_path)
+
+    tenants = TenantService.get_info_by(current_user.id)
+    if not tenants:
+        return get_data_error_result(message="Tenant not found!")
+
+    asr_id = tenants[0]["asr_id"]
+    if not asr_id:
+        return get_data_error_result(message="No default ASR model is set")
+
+    asr_mdl=LLMBundle(tenants[0]["tenant_id"], LLMType.SPEECH2TEXT, asr_id)
+    if not stream_mode:
+        text = asr_mdl.transcription(temp_audio_path)
+        try:
+            os.remove(temp_audio_path)
+        except Exception as e:
+            logging.error(f"Failed to remove temp audio file: {str(e)}")
+        return get_json_result(data={"text": text})
+    async def event_stream():
+        try:
+            for evt in asr_mdl.stream_transcription(temp_audio_path):
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            err = {"event": "error", "text": str(e)}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+        finally:
+            try:
+                os.remove(temp_audio_path)
+            except Exception as e:
+                logging.error(f"Failed to remove temp audio file: {str(e)}")
+
+    return Response(event_stream(), content_type="text/event-stream")
 
 @manager.route("/tts", methods=["POST"])  # noqa: F821
 @login_required
-def tts():
-    req = request.json
+async def tts():
+    req = await get_request_json()
     text = req["text"]
 
     tenants = TenantService.get_info_by(current_user.id)
@@ -373,8 +433,8 @@ def tts():
 @manager.route("/delete_msg", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("conversation_id", "message_id")
-def delete_msg():
-    req = request.json
+async def delete_msg():
+    req = await get_request_json()
     e, conv = ConversationService.get_by_id(req["conversation_id"])
     if not e:
         return get_data_error_result(message="Conversation not found!")
@@ -396,8 +456,8 @@ def delete_msg():
 @manager.route("/thumbup", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("conversation_id", "message_id")
-def thumbup():
-    req = request.json
+async def thumbup():
+    req = await get_request_json()
     e, conv = ConversationService.get_by_id(req["conversation_id"])
     if not e:
         return get_data_error_result(message="Conversation not found!")
@@ -423,8 +483,8 @@ def thumbup():
 @manager.route("/ask", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("question", "kb_ids")
-def ask_about():
-    req = request.json
+async def ask_about():
+    req = await get_request_json()
     uid = current_user.id
 
     search_id = req.get("search_id", "")
@@ -435,10 +495,10 @@ def ask_about():
     if search_app:
         search_config = search_app.get("search_config", {})
 
-    def stream():
+    async def stream():
         nonlocal req, uid
         try:
-            for ans in ask(req["question"], req["kb_ids"], uid, search_config=search_config):
+            async for ans in async_ask(req["question"], req["kb_ids"], uid, search_config=search_config):
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
         except Exception as e:
             yield "data:" + json.dumps({"code": 500, "message": str(e), "data": {"answer": "**ERROR**: " + str(e), "reference": []}}, ensure_ascii=False) + "\n\n"
@@ -455,8 +515,8 @@ def ask_about():
 @manager.route("/mindmap", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("question", "kb_ids")
-def mindmap():
-    req = request.json
+async def mindmap():
+    req = await get_request_json()
     search_id = req.get("search_id", "")
     search_app = SearchService.get_detail(search_id) if search_id else {}
     search_config = search_app.get("search_config", {}) if search_app else {}
@@ -464,7 +524,7 @@ def mindmap():
     kb_ids.extend(req["kb_ids"])
     kb_ids = list(set(kb_ids))
 
-    mind_map = gen_mindmap(req["question"], kb_ids, search_app.get("tenant_id", current_user.id), search_config)
+    mind_map = await gen_mindmap(req["question"], kb_ids, search_app.get("tenant_id", current_user.id), search_config)
     if "error" in mind_map:
         return server_error_response(Exception(mind_map["error"]))
     return get_json_result(data=mind_map)
@@ -473,8 +533,8 @@ def mindmap():
 @manager.route("/related_questions", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("question")
-def related_questions():
-    req = request.json
+async def related_questions():
+    req = await get_request_json()
 
     search_id = req.get("search_id", "")
     search_config = {}
@@ -491,7 +551,7 @@ def related_questions():
     if "parameter" in gen_conf:
         del gen_conf["parameter"]
     prompt = load_prompt("related_question")
-    ans = chat_mdl.chat(
+    ans = await chat_mdl.async_chat(
         prompt,
         [
             {

@@ -1,6 +1,13 @@
 import { RunningStatus } from '@/constants/knowledge';
+import { DataSourceKey } from '@/pages/user-setting/data-source/contant';
 import { TreeData } from '@antv/g6/lib/types';
-
+export interface IConnector {
+  id: string;
+  name: string;
+  status: RunningStatus;
+  source: DataSourceKey;
+  auto_parse?: '0' | '1';
+}
 // knowledge base
 export interface IKnowledge {
   avatar?: any;
@@ -35,6 +42,7 @@ export interface IKnowledge {
   mindmap_task_id?: string;
   graphrag_task_finish_at: string;
   graphrag_task_id: string;
+  connectors: IConnector[];
 }
 
 export interface IKnowledgeResult {
@@ -108,12 +116,15 @@ export interface ITenantInfo {
   tts_id: string;
 }
 
+export type ChunkDocType = 'image' | 'table';
+
 export interface IChunk {
   available_int: number; // Whether to enable, 0: not enabled, 1: enabled
   chunk_id: string;
   content_with_weight: string;
   doc_id: string;
   doc_name: string;
+  doc_type_kwd?: ChunkDocType;
   image_id: string;
   important_kwd?: string[];
   question_kwd?: string[]; // keywords

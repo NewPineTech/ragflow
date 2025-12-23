@@ -64,8 +64,6 @@ export function InputForm({ onOk }: IModalProps<any>) {
           path: ['parser_id'],
         });
       }
-
-      console.log('form-data', data);
       // When parseType === 1, pipline_id required
       if (data.parseType === 2 && !data.pipeline_id) {
         ctx.addIssue({

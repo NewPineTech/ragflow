@@ -19,13 +19,8 @@ import re
 import logging
 import time
 from datetime import datetime, timedelta
-from flask import request, Response
-from api.db.services.llm_service import LLMBundle
-from flask_login import login_required, current_user
-
-from api.db import VALID_FILE_TYPES, FileType
-from api.db.db_models import APIToken, Task, File
-from api.db.services import duplicate_name
+from quart import request
+from api.db.db_models import APIToken
 from api.db.services.api_service import APITokenService, API4ConversationService
 from api.db.services.dialog_service import DialogService, chat, chatv1
 from api.db.services.document_service import DocumentService, doc_upload_and_parse
@@ -34,6 +29,7 @@ from api.db.services.file_service import FileService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.task_service import queue_tasks, TaskService
 from api.db.services.user_service import UserTenantService
+from api.utils.api_utils import generate_confirmation_token, get_data_error_result, get_json_result, get_request_json, server_error_response, validate_request
 from api import settings
 from common.misc_utils import get_uuid
 from common.constants import RetCode, VALID_TASK_STATUS, LLMType, ParserType, FileSource
@@ -45,6 +41,7 @@ from rag.app.tag import label_question
 from rag.prompts.generator import keyword_extraction
 from rag.utils.storage_factory import STORAGE_IMPL
 from common.time_utils import current_timestamp, datetime_format
+from api.apps import login_required, current_user
 
 from api.db.services.canvas_service import UserCanvasService
 from agent.canvas import Canvas
@@ -57,8 +54,8 @@ chat_func = chatv1 if use_v1 else chat
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
 @login_required
-def new_token():
-    req = request.json
+async def new_token():
+    req = await get_request_json()
     try:
         tenants = UserTenantService.query(user_id=current_user.id)
         if not tenants:
@@ -103,8 +100,8 @@ def token_list():
 @manager.route('/rm', methods=['POST'])  # noqa: F821
 @validate_request("tokens", "tenant_id")
 @login_required
-def rm():
-    req = request.json
+async def rm():
+    req = await get_request_json()
     try:
         for token in req["tokens"]:
             APITokenService.filter_delete(
@@ -132,14 +129,18 @@ def stats():
                 "to_date",
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "agent" if "canvas_id" in request.args else None)
-        res = {
-            "pv": [(o["dt"], o["pv"]) for o in objs],
-            "uv": [(o["dt"], o["uv"]) for o in objs],
-            "speed": [(o["dt"], float(o["tokens"]) / (float(o["duration"] + 0.1))) for o in objs],
-            "tokens": [(o["dt"], float(o["tokens"]) / 1000.) for o in objs],
-            "round": [(o["dt"], o["round"]) for o in objs],
-            "thumb_up": [(o["dt"], o["thumb_up"]) for o in objs]
-        }
+
+        res = {"pv": [], "uv": [], "speed": [], "tokens": [], "round": [], "thumb_up": []}
+
+        for obj in objs:
+            dt = obj["dt"]
+            res["pv"].append((dt, obj["pv"]))
+            res["uv"].append((dt, obj["uv"]))
+            res["speed"].append((dt, float(obj["tokens"]) / (float(obj["duration"]) + 0.1))) # +0.1 to avoid division by zero
+            res["tokens"].append((dt, float(obj["tokens"]) / 1000.0)) # convert to thousands
+            res["round"].append((dt, obj["round"]))
+            res["thumb_up"].append((dt, obj["thumb_up"]))
+
         return get_json_result(data=res)
     except Exception as e:
         return server_error_response(e)
