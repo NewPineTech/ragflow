@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-<<<<<<< HEAD
 import os
 import logging
 from common.config_utils import get_base_config, decrypt_database_config
@@ -95,5 +94,4 @@ def get_svr_queue_name(priority: int) -> str:
 
 def get_svr_queue_names():
     return [get_svr_queue_name(priority) for priority in [1, 0]]
-=======
->>>>>>> origin/main
+

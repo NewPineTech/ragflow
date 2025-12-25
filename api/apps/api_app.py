@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from quart import request
 from api.db.db_models import APIToken
 from api.db.services.api_service import APITokenService, API4ConversationService
-from api.db.services.dialog_service import DialogService, chat, chatv1
+from api.db.services.dialog_service import DialogService, chatv1, async_chat
 from api.db.services.document_service import DocumentService, doc_upload_and_parse
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
@@ -30,7 +30,7 @@ from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.task_service import queue_tasks, TaskService
 from api.db.services.user_service import UserTenantService
 from api.utils.api_utils import generate_confirmation_token, get_data_error_result, get_json_result, get_request_json, server_error_response, validate_request
-from api import settings
+from common import settings
 from common.misc_utils import get_uuid
 from common.constants import RetCode, VALID_TASK_STATUS, LLMType, ParserType, FileSource
 from api.utils.api_utils import server_error_response, get_data_error_result, get_json_result, validate_request, \
@@ -39,7 +39,7 @@ from api.utils.cache_utils import get_cached_dialog, cache_dialog, get_cached_co
 from api.utils.file_utils import filename_type, thumbnail
 from rag.app.tag import label_question
 from rag.prompts.generator import keyword_extraction
-from rag.utils.storage_factory import STORAGE_IMPL
+from common.settings import STORAGE_IMPL
 from common.time_utils import current_timestamp, datetime_format
 from api.apps import login_required, current_user
 
@@ -50,7 +50,7 @@ from pathlib import Path
 from rag.utils.redis_conn import REDIS_CONN
 
 use_v1 = True
-chat_func = chatv1 if use_v1 else chat
+chat_func = chatv1 if use_v1 else async_chat
 
 @manager.route('/new_token', methods=['POST'])  # noqa: F821
 @login_required

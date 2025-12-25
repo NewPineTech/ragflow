@@ -24,6 +24,7 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps 
 
 ENV TIKA_SERVER_JAR="file:///ragflow/tika-server-standard-3.0.0.jar"
 ENV DEBIAN_FRONTEND=noninteractive
+ENV UV_INDEX_URL=https://pypi.org/simple
 
 # Setup apt
 # Python package and implicit dependencies:
@@ -147,11 +148,11 @@ COPY pyproject.toml uv.lock ./
 # https://github.com/astral-sh/uv/issues/10462
 # uv records index url into uv.lock but doesn't failover among multiple indexes
 RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
-    if [ "$NEED_MIRROR" == "1" ]; then \
-        sed -i 's|pypi.org|pypi.tuna.tsinghua.edu.cn|g' uv.lock; \
-    else \
-        sed -i 's|pypi.tuna.tsinghua.edu.cn|pypi.org|g' uv.lock; \
-    fi; \
+    #if [ "$NEED_MIRROR" == "1" ]; then \
+    #    sed -i 's|pypi.org|pypi.tuna.tsinghua.edu.cn|g' uv.lock; \
+    #else \
+    #    sed -i 's|pypi.tuna.tsinghua.edu.cn|pypi.org|g' uv.lock; \
+    #fi; \
     uv sync --python 3.12 --frozen
 
 COPY web web

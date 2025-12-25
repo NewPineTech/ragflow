@@ -22,8 +22,8 @@ import os
 
 import copy
 from pinecone import Pinecone, ServerlessSpec
-from rag import settings
-from rag.settings import TAG_FLD, PAGERANK_FLD
+from common import settings
+from common.settings import TAG_FLD, PAGERANK_FLD
 from common.decorator import singleton
 from common.file_utils import get_project_base_directory
 from rag.utils.doc_store_conn import DocStoreConnection, MatchExpr, OrderByExpr, MatchTextExpr, MatchDenseExpr, \

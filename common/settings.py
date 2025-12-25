@@ -88,6 +88,7 @@ REGISTER_ENABLED = 1
 
 
 # sandbox-executor-manager
+SANDBOX_ENABLED = 0
 SANDBOX_HOST = None
 STRONG_TEST_COUNT = int(os.environ.get("STRONG_TEST_COUNT", "8"))
 
@@ -112,14 +113,19 @@ OSS = {}
 OS = {}
 GCS = {}
 
-DOC_MAXIMUM_SIZE: int = 128 * 1024 * 1024
-DOC_BULK_SIZE: int = 4
-EMBEDDING_BATCH_SIZE: int = 16
+DOC_MAXIMUM_SIZE = 128 * 1024 * 1024
+DOC_BULK_SIZE = 4
+EMBEDDING_BATCH_SIZE = 16
 
-PARALLEL_DEVICES: int = 0
+PARALLEL_DEVICES = 0
 
 STORAGE_IMPL_TYPE = os.getenv('STORAGE_IMPL', 'MINIO')
 STORAGE_IMPL = None
+
+# Additional rag.settings constants
+PAGERANK_FLD = "pagerank_fea"
+TAG_FLD = "tag_feas"
+PINECONE = {}
 
 def get_svr_queue_name(priority: int) -> str:
     if priority == 0:
@@ -210,10 +216,11 @@ def init_settings():
     IMAGE2TEXT_CFG = _resolve_per_model_config(image2text_entry, LLM_FACTORY, API_KEY, LLM_BASE_URL)
 
     CHAT_MDL = CHAT_CFG.get("model", "") or ""
-    EMBEDDING_MDL = EMBEDDING_CFG.get("model", "") or ""
     compose_profiles = os.getenv("COMPOSE_PROFILES", "")
     if "tei-" in compose_profiles:
-        EMBEDDING_MDL = os.getenv("TEI_MODEL", EMBEDDING_MDL or "BAAI/bge-small-en-v1.5")
+        EMBEDDING_MDL = os.getenv("TEI_MODEL", "BAAI/bge-small-en-v1.5")
+    else:
+        EMBEDDING_MDL = EMBEDDING_CFG.get("model", "") or ""
     RERANK_MDL = RERANK_CFG.get("model", "") or ""
     ASR_MDL = ASR_CFG.get("model", "") or ""
     IMAGE2TEXT_MDL = IMAGE2TEXT_CFG.get("model", "") or ""
@@ -244,6 +251,9 @@ def init_settings():
     if lower_case_doc_engine == "elasticsearch":
         ES = get_base_config("es", {})
         docStoreConn = rag.utils.es_conn.ESConnection()
+        # Uncomment to use ESConnectionV1:
+        # import rag.utils.es_conn_v1
+        # docStoreConn = rag.utils.es_conn_v1.ESConnectionV1()
     elif lower_case_doc_engine == "infinity":
         INFINITY = get_base_config("infinity", {"uri": "infinity:23817"})
         docStoreConn = rag.utils.infinity_conn.InfinityConnection()
@@ -256,7 +266,7 @@ def init_settings():
     else:
         raise Exception(f"Not supported doc engine: {DOC_ENGINE}")
 
-    global AZURE, S3, MINIO, OSS, GCS
+    global AZURE, S3, MINIO, OSS, GCS, PINECONE
     if STORAGE_IMPL_TYPE in ['AZURE_SPN', 'AZURE_SAS']:
         AZURE = get_base_config("azure", {})
     elif STORAGE_IMPL_TYPE == 'AWS_S3':
@@ -267,6 +277,14 @@ def init_settings():
         OSS = get_base_config("oss", {})
     elif STORAGE_IMPL_TYPE == 'GCS':
         GCS = get_base_config("gcs", {})
+    
+    # Pinecone configuration (if DOC_ENGINE is pinecone)
+    if DOC_ENGINE.lower() == 'pinecone':
+        PINECONE = {
+            "api_key": os.getenv("PINECONE_API_KEY"),
+            "cloud": os.getenv("PINECONE_CLOUD", "aws"),
+            "region": os.getenv("PINECONE_REGION", "us-east-1")
+        }
 
     global STORAGE_IMPL
     storage_impl = StorageFactory.create(Storage[STORAGE_IMPL_TYPE])
@@ -297,8 +315,9 @@ def init_settings():
 
     kg_retriever = kg_search.KGSearch(docStoreConn)
 
-    global SANDBOX_HOST
-    if int(os.environ.get("SANDBOX_ENABLED", "0")):
+    global SANDBOX_ENABLED, SANDBOX_HOST
+    SANDBOX_ENABLED = int(os.environ.get("SANDBOX_ENABLED", "0"))
+    if SANDBOX_ENABLED:
         SANDBOX_HOST = os.environ.get("SANDBOX_HOST", "sandbox-executor-manager")
 
     global SMTP_CONF

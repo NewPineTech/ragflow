@@ -544,7 +544,9 @@ def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, la
         old_memory=short_memory,
     )
 
-    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = chat_mdl._run_coroutine_sync(
+        chat_mdl.async_chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    )
     ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
     return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
 

@@ -29,7 +29,7 @@ from api.db.services.llm_service import LLMBundle
 from api.db.services.search_service import SearchService
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserTenantService
-from api.utils.api_utils import get_data_error_result, get_json_result, server_error_response, validate_request
+from api.utils.api_utils import get_data_error_result, get_json_result, server_error_response, validate_request, get_request_json
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 from api.utils.cache_utils import (
     get_cached_dialog, cache_dialog,
@@ -42,7 +42,7 @@ import time
 
 
 use_v1 = True
-async_chat_func = async_chatv1 if use_v1 else async_chat
+async_chat_func = chatv1 if use_v1 else async_chat
 
 @manager.route("/set", methods=["POST"])  # noqa: F821
 @login_required
@@ -285,7 +285,7 @@ async def completion():
         async def stream():
             nonlocal dia, msg, req, conv, conversation_id, memory
             try:
-                async for ans in async_chat(dia, msg, True, **req):
+                async for ans in async_chat_func(dia, msg, True, **req):
                     ans = structure_answer(conv, ans, message_id, conv.id, memory)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
                 

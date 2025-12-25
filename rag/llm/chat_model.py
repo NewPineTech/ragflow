@@ -136,7 +136,7 @@ class Base(ABC):
         return gen_conf
 
     async def _async_chat_streamly(self, history, gen_conf, **kwargs):
-        logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
+        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         reasoning_start = False
 
         request_kwargs = {"model": self.model_name, "messages": history, "stream": True, **gen_conf}
@@ -1307,7 +1307,7 @@ class LiteLLMBase(ABC):
     async def async_chat_streamly(self, system, history, gen_conf, **kwargs):
         if system and history and history[0].get("role") != "system":
             history.insert(0, {"role": "system", "content": system})
-        logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
+        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         gen_conf = self._clean_conf(gen_conf)
         reasoning_start = False
         total_tokens = 0

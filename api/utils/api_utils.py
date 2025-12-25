@@ -263,7 +263,7 @@ def token_required(func):
         cached_tenant = REDIS_CONN.get(f"api_token:{token}")
         if cached_tenant:
             kwargs["tenant_id"] = cached_tenant
-            return func(*args, **kwargs)
+            return True, kwargs
 
         objs = APIToken.query(token=token)
         if not objs:

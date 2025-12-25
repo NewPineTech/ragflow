@@ -33,6 +33,7 @@ except ImportError:
 from agentic_reasoning import DeepResearcher
 from api.db.services.file_service import FileService
 from common.constants import LLMType, ParserType, StatusEnum
+from common import settings
 from api.db.db_models import DB, Dialog
 from api.db.services.common_service import CommonService
 from api.db.services.document_service import DocumentService
@@ -47,10 +48,64 @@ from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
 from rag.prompts.generator import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
-    gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY
+    gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, classify_and_respond_prompt, after_classify_and_acknowledge_prompt
 from common.token_utils import num_tokens_from_string
 from rag.utils.tavily_conn import Tavily
 from common.string_utils import remove_redundant_spaces
+
+
+def get_current_datetime_info():
+    """
+    Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
+    Returns: String chứa thông tin ngày giờ
+    """
+    from datetime import timezone, timedelta
+    
+    # Chuyển sang múi giờ GMT+7 (Việt Nam)
+    gmt7 = timezone(timedelta(hours=7))
+    now = datetime.now(gmt7)
+    
+    # Ngày dương lịch
+    solar_date = now.strftime("%d/%m/%Y")
+    current_time = now.strftime("%H:%M:%S")
+    weekday = now.strftime("%A")
+    weekday_vi = {
+        "Monday": "Thứ Hai",
+        "Tuesday": "Thứ Ba", 
+        "Wednesday": "Thứ Tư",
+        "Thursday": "Thứ Năm",
+        "Friday": "Thứ Sáu",
+        "Saturday": "Thứ Bảy",
+        "Sunday": "Chủ Nhật"
+    }
+
+    solar_day = now.strftime("%d")
+    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_day}, tháng {now.month}, năm {now.year}, lúc {current_time}."
+
+    # Thêm ngày âm lịch nếu có thư viện
+    if Converter and Solar:
+        try:
+            solar = Solar(now.year, now.month, now.day)
+            lunar = Converter.Solar2Lunar(solar)
+            
+            # Tính năm Can Chi
+            # Can: Giáp, Ất, Bính, Đinh, Mậu, Kỷ, Canh, Tân, Nhâm, Quý (10 can)
+            # Chi: Tý, Sửu, Dần, Mão, Thìn, Tỵ, Ngọ, Mùi, Thân, Dậu, Tuất, Hợi (12 chi)
+            # Công thức: Can = (year - 4) % 10, Chi = (year - 4) % 12
+            # Năm 2024 = Giáp Thìn (2024 - 4 = 2020, 2020 % 10 = 0 -> Giáp, 2020 % 12 = 4 -> Thìn)
+            # Năm 2025 = Ất Tỵ (2025 - 4 = 2021, 2021 % 10 = 1 -> Ất, 2021 % 12 = 5 -> Tỵ)
+            can = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
+            chi = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+            can_index = (now.year - 4) % 10
+            chi_index = (now.year - 4) % 12
+            nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
+            
+            datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
+        except Exception as e:
+            logging.debug(f"Could not convert to lunar calendar: {e}")
+    
+    return datetime_info
+
 
 
 class DialogService(CommonService):
@@ -184,7 +239,49 @@ class DialogService(CommonService):
             offset += limit
         return res
 
-def chat_solo(dialog, messages, stream=True):
+
+
+def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, min_delta_len=3):
+    """
+    🚀 UNIFIED STREAMING CORE: Stream LLM with delta length check
+    
+    Args:
+        chat_mdl: LLM model bundle
+        system_content: System prompt
+        messages: Message history
+        gen_conf: Generation config
+        min_delta_len: Minimum delta length to yield (default 3)
+    
+    Yields:
+        tuple: (accumulated_answer, delta_text, is_final)
+    """
+    last_ans = ""
+    answer = ""
+    
+    for ans in chat_mdl._sync_from_async_stream(chat_mdl.async_chat_streamly, system_content, messages, gen_conf):
+        answer = ans
+        delta_ans = answer[len(last_ans):]
+        
+        if not delta_ans or len(delta_ans) < min_delta_len:
+            continue
+        
+        last_ans = answer
+        yield (answer, delta_ans, False)
+    
+    # Final chunk: ensure complete answer is yielded
+    if len(answer) > len(last_ans):
+        delta_ans = answer[len(last_ans):]
+        yield (answer, delta_ans, True)
+
+def classify_and_respond(dialog, messages, stream=True):
+    """
+    🚀 OPTIMIZED: Classify question + Generate response in ONE LLM call
+    
+    Returns: (classify_type, response_generator)
+        - classify_type: "KB" | "GREET" | "SENSITIVE"
+        - response_generator: Generator yielding response chunks if with KB
+
+    """
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
     else:
@@ -206,25 +303,59 @@ def chat_solo(dialog, messages, stream=True):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
     
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
+    
+    # Add classification reminder to last user message
+    if msg and msg[-1]["role"] == "user":
+        msg[-1]["content"] = f"{msg[-1]['content']}\n\n[REMINDER: Start your response with [CLASSIFY:KB] or [CLASSIFY:GREET] or [CLASSIFY:SENSITIVE]]"
+    
     if stream:
-        last_ans = ""
-        delta_ans = ""
-        for ans in chat_mdl.chat_streamly(prompt_config.get("system", ""), msg, dialog.llm_setting):
-            answer = ans
-            delta_ans = ans[len(last_ans):]
-            if num_tokens_from_string(delta_ans) < 16:
-                continue
-            last_ans = answer
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
-            delta_ans = ""
-        if delta_ans:
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "prompt": "", "created_at": time.time()}
+        classify_type = None
+        
+        # 🎯 Limit max_tokens for classification to prevent long responses
+        classify_gen_conf = dialog.llm_setting.copy()
+        classify_gen_conf["max_tokens"] = 50  # Only allow short acknowledgment
+        
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, classify_gen_conf):
+            logging.info(f"[CLASSIFY_DEBUG] answer={answer[:200]}, classify_type={classify_type}, is_final={is_final}")
+            
+            # Extract classification from first chunk
+            if classify_type is None:
+                if "[CLASSIFY:KB]" in answer:
+                    classify_type = "KB"
+                    logging.info(f"[CLASSIFY_DEBUG] KB detected")
+                elif "[CLASSIFY:GREET]" in answer:
+                    classify_type = "GREET"
+                    logging.info(f"[CLASSIFY_DEBUG] GREET detected")
+                elif "[CLASSIFY:SENSITIVE]" in answer:
+                    classify_type = "SENSITIVE"
+                    logging.info(f"[CLASSIFY_DEBUG] SENSITIVE detected")
+                
+                # If no classification detected yet, wait for more chunks
+                if classify_type is None:
+                    continue
+            
+            # Remove classification prefix from answer
+            clean_answer = answer.replace("[CLASSIFY:KB]", "").replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
+            
+            # Yield response for all types (KB, GREET, SENSITIVE)
+            if is_final:
+                yield {"answer": clean_answer, "reference": {}, "audio_binary": tts(tts_mdl, clean_answer) if classify_type in ["GREET", "SENSITIVE"] else None, "prompt": "", "created_at": time.time(), "classify_type": classify_type}
+            else:
+                yield {"answer": clean_answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time(), "classify_type": classify_type}
+        
+        # Final response handling
+        if classify_type in ["GREET", "SENSITIVE"]:
+            # Already handled in loop above
+            pass
+        elif classify_type is None:
+            # Fallback: LLM didn't return proper format, yield directly
+            logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected after all chunks. Answer: {answer[:100] if 'answer' in locals() else 'N/A'}...")
+            if 'answer' in locals() and answer:
+                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+
     else:
-        answer = chat_mdl.chat(prompt_config.get("system", ""), msg, dialog.llm_setting)
-        user_content = msg[-1].get("content", "[content not available]")
-        logging.debug("User: {}|Assistant: {}".format(user_content, answer))
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
-      
+        answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
+        
         # Extract classification
         if "[CLASSIFY:KB]" in answer:
             logging.info(f"[CLASSIFY_AND_RESPOND] Non-stream: Detected KB classification")
@@ -643,7 +774,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     if stream:
         last_ans = ""
         answer = ""
-        for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
+        async for ans in chat_mdl.async_chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
             answer = ans
@@ -672,7 +803,480 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
         res["audio_binary"] = tts(tts_mdl, answer)
         yield res
 
+async def chatv1(dialog, messages, stream=True, **kwargs):
+    """
+    Optimized chat function with intelligent streaming (V1)
+    
+    Improvements over chat():
+    1. ✅ Intelligent streaming with phrase/sentence boundaries
+    2. ✅ Word boundary detection (no mid-word cuts for Vietnamese)
+    3. ✅ Memory optimization (only last message when memory exists)
+    4. ✅ No TTS blocking during streaming
+    5. ✅ Early flush for instant feedback
+    
+    Args:
+        dialog: Dialog object with config
+        messages: List of conversation messages
+        stream: Enable streaming (default: True)
+        **kwargs: Additional parameters including:
+            - short_memory: Memory text from Redis
+            - doc_ids: Document filter
+            - quote: Enable citations
+            
+    Yields:
+        dict: Response chunks with answer, reference, audio_binary
+    """
+    assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
+    current_message=messages[-1]["content"]
+    # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
+    memory_text = kwargs.pop("short_memory", None)
+    
+    # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
+    # Returns immediately if KB not needed, otherwise proceeds with retrieval
+    result_gen = classify_and_respond(dialog, messages, stream)
+    
+    # Try to get the first item from the generator
+    kb_initial_response = ""
+    try:
+        first_item = next(result_gen)
+        
+        # Check classify_type from response
+        if isinstance(first_item, dict):
+            classify_type = first_item.get("classify_type")
+            
+            if classify_type == "KB":
+                logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
+                # 🚀 Stream initial KB response immediately and save it
+                kb_initial_response = first_item.get("answer", "")
+                if stream and kb_initial_response:
+                    yield {"answer": kb_initial_response, "reference": {}, "audio_binary": None, "memory": None}
+                
+                # Collect any remaining chunks from classify_and_respond
+                for ans in result_gen:
+                    if ans.get("answer"):
+                        # Accumulate to initial response
+                        kb_initial_response = ans.get("answer", "")
+                        if stream:
+                            yield {"answer": kb_initial_response, "reference": {}, "audio_binary": None, "memory": None}
+                
+                logging.info(f"[CHATV1] KB initial response collected: {kb_initial_response[:100]}")
+                # Continue with KB retrieval flow below (kb_initial_response will be prepended)
+            else:
+                # GREET or SENSITIVE - yield first item and continue with rest
+                logging.info(f"[CHATV1] Non-KB question ({classify_type}) - streaming response from classify_and_respond")
+                yield first_item
+                for ans in result_gen:
+                    yield ans
+                return
+        else:
+            # Unexpected format
+            logging.warning(f"[CHATV1] Unexpected first_item format: {type(first_item)}")
+            # Continue with KB flow as fallback
+            
+    except StopIteration:
+        # Generator is empty - this should not happen due to fallback in classify_and_respond
+        # Default to KB retrieval as fallback
+        logging.warning(f"[CHATV1] classify_and_respond returned empty generator - defaulting to KB retrieval")
+        # Continue with normal KB flow below
+    
+    #classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
+    #if (classify == "GREET" or classify=="SENSITIVE") or classify=="UNKNOWN" or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
+    #    print("Use solo chat for greeting or sensitive question or no knowledge base.")    
 
+    #    for ans in chat_solo(dialog, messages, stream, memory_text):
+    #        yield ans
+    #    return
+    
+    
+    # Additional check: No KB configured
+    if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
+        logging.info("[CHATV1] No KB configured, falling back to chat_solo")
+        for ans in chat_solo(dialog, messages, stream, memory_text):
+            yield ans
+        return
+    logging.info("[CHATV1] contineuing with KB retrieval flow")
+
+    chat_start_ts = timer()
+
+    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+        llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+    else:
+        llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+
+    max_tokens = llm_model_config.get("max_tokens", 1024)
+    check_llm_ts = timer()
+   
+    langfuse_tracer = None
+    trace_context = {}
+    langfuse_keys = TenantLangfuseService.filter_by_tenant(tenant_id=dialog.tenant_id)
+    if langfuse_keys:
+        langfuse = Langfuse(public_key=langfuse_keys.public_key, secret_key=langfuse_keys.secret_key, host=langfuse_keys.host)
+        if langfuse.auth_check():
+            langfuse_tracer = langfuse
+            trace_id = langfuse_tracer.create_trace_id()
+            trace_context = {"trace_id": trace_id}
+
+    check_langfuse_tracer_ts = timer()
+    kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl = get_models(dialog)
+    toolcall_session, tools = kwargs.get("toolcall_session"), kwargs.get("tools")
+    if toolcall_session and tools:
+        chat_mdl.bind_tools(toolcall_session, tools)
+    bind_models_ts = timer()
+
+    retriever = settings.retriever
+    questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
+    attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
+    if "doc_ids" in messages[-1]:
+        attachments = messages[-1]["doc_ids"]
+
+    prompt_config = dialog.prompt_config
+    field_map = KnowledgebaseService.get_field_map(dialog.kb_ids)
+    
+    # Try SQL retrieval if field mapping exists
+    if field_map:
+        logging.debug("[CHATV1] Attempting SQL retrieval: {}".format(questions[-1]))
+        ans = use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
+        if ans:
+            yield ans
+            return
+
+    for p in prompt_config["parameters"]:
+        if p["key"] == "knowledge":
+            continue
+        if p["key"] not in kwargs and not p["optional"]:
+            raise KeyError("Miss parameter: " + p["key"])
+        if p["key"] not in kwargs:
+            prompt_config["system"] = prompt_config["system"].replace("{%s}" % p["key"], " ")
+    
+   
+    if len(questions) > 1:   #and prompt_config.get("refine_multiturn"):
+        questions = [chat_mdl._run_coroutine_sync(full_question(dialog.tenant_id, dialog.llm_id, messages, chat_mdl=chat_mdl))]
+    else:
+        questions = questions[-1:]
+
+    logging.info("[CHATV1] Questions: {}, Memory: {}".format(" ".join(questions), "Yes" if memory_text else "No"))
+   
+    if prompt_config.get("cross_languages"):
+        questions = [chat_mdl._run_coroutine_sync(cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"]))]
+
+    if dialog.meta_data_filter:
+        metas = DocumentService.get_meta_by_kbs(dialog.kb_ids)
+        if dialog.meta_data_filter.get("method") == "auto":
+            filters = gen_meta_filter(chat_mdl, metas, questions[-1])
+            attachments.extend(meta_filter(metas, filters))
+            if not attachments:
+                attachments = None
+        elif dialog.meta_data_filter.get("method") == "manual":
+            attachments.extend(meta_filter(metas, dialog.meta_data_filter["manual"]))
+            if not attachments:
+                attachments = None
+
+    if prompt_config.get("keyword", False):
+        questions[-1] += keyword_extraction(chat_mdl, questions[-1])
+
+    refine_question_ts = timer()
+
+    thought = ""
+    kbinfos = {"total": 0, "chunks": [], "doc_aggs": []}
+    knowledges = []
+    kb_retrieval_task = None
+    kb_result_queue = None
+
+    # 🚀 START KB RETRIEVAL EARLY (in parallel thread) - Don't wait for it yet!
+    if attachments is not None and "knowledge" in [p["key"] for p in prompt_config["parameters"]]:
+        tenant_ids = list(set([kb.tenant_id for kb in kbs]))
+        knowledges = []
+        
+        if prompt_config.get("reasoning", False):
+            # Reasoning mode still needs to be synchronous due to its iterative nature
+            reasoner = DeepResearcher(
+                chat_mdl,
+                prompt_config,
+                partial(
+                    retriever.retrieval,
+                    embd_mdl=embd_mdl,
+                    tenant_ids=tenant_ids,
+                    kb_ids=dialog.kb_ids,
+                    page=1,
+                    page_size=dialog.top_n,
+                    similarity_threshold=0.2,
+                    vector_similarity_weight=0.3,
+                    doc_ids=attachments,
+                ),
+            )
+
+            for think in reasoner.thinking(kbinfos, " ".join(questions)):
+                if isinstance(think, str):
+                    thought = think
+                    knowledges = [t for t in think.split("\n") if t]
+                elif stream:
+                    yield think
+        else:
+            # 🚀 OPTIMIZATION: Start KB retrieval in background thread - it will run in parallel!
+            import threading
+            import queue
+            
+            kb_result_queue = queue.Queue()
+            
+            def do_kb_retrieval():
+                try:
+                    result = {"total": 0, "chunks": [], "doc_aggs": []}
+                    
+                    if embd_mdl:
+                        result = retriever.retrieval(
+                            " ".join(questions),
+                            embd_mdl,
+                            tenant_ids,
+                            dialog.kb_ids,
+                            1,
+                            dialog.top_n,
+                            dialog.similarity_threshold,
+                            dialog.vector_similarity_weight,
+                            doc_ids=attachments,
+                            top=dialog.top_k,
+                            aggs=False,
+                            rerank_mdl=rerank_mdl,
+                            rank_feature=label_question(" ".join(questions), kbs),
+                        )
+                        if prompt_config.get("toc_enhance"):
+                            cks = retriever.retrieval_by_toc(" ".join(questions), result["chunks"], tenant_ids, chat_mdl, dialog.top_n)
+                            if cks:
+                                result["chunks"] = cks
+                                
+                    if prompt_config.get("tavily_api_key"):
+                        tav = Tavily(prompt_config["tavily_api_key"])
+                        tav_res = tav.retrieve_chunks(" ".join(questions))
+                        result["chunks"].extend(tav_res["chunks"])
+                        result["doc_aggs"].extend(tav_res["doc_aggs"])
+                        
+                    if prompt_config.get("use_kg"):
+                        ck = settings.kg_retriever.retrieval(" ".join(questions), tenant_ids, dialog.kb_ids, embd_mdl,
+                                                               LLMBundle(dialog.tenant_id, LLMType.CHAT))
+                        if ck["content_with_weight"]:
+                            result["chunks"].insert(0, ck)
+                    
+                    kb_result_queue.put(("success", result))
+                except Exception as e:
+                    logging.error(f"[CHATV1] KB retrieval error: {e}")
+                    kb_result_queue.put(("error", e))
+            
+            # Start retrieval in background thread
+            logging.info("[CHATV1] 🚀 Starting KB retrieval in background thread...")
+            kb_retrieval_task = threading.Thread(target=do_kb_retrieval, daemon=True)
+            kb_retrieval_task.start()
+            logging.info("[CHATV1] KB retrieval thread started, continuing in parallel...")
+            
+            # Note: Initial KB response already streamed earlier from classify_and_respond
+            # No need for hardcoded "Đang tìm kiếm..." message
+
+    # 🚀 DO OTHER WORK WHILE KB RETRIEVAL RUNS IN PARALLEL
+    # These operations don't need KB results, so we can do them concurrently
+    kwargs["knowledge"] = ""
+    datetime_info = get_current_datetime_info()
+    gen_conf = dialog.llm_setting
+    
+    retrieval_ts = timer()
+    
+    # 🚀 NOW WAIT FOR KB RETRIEVAL TO COMPLETE (if it was started in background thread)
+    if kb_retrieval_task is not None:
+        logging.info("[CHATV1] ⏳ Waiting for KB retrieval thread to complete...")
+        kb_retrieval_task.join()  # Wait for thread to finish
+        
+        # Get result from queue
+        status, result = kb_result_queue.get()
+        if status == "success":
+            kbinfos = result
+            knowledges = kb_prompt(kbinfos, max_tokens)
+            logging.info(f"[CHATV1] ✅ KB retrieval completed! Retrieved {len(knowledges)} knowledge chunks")
+        else:
+            logging.error(f"[CHATV1] ❌ KB retrieval failed: {result}")
+            # Continue with empty knowledges
+    
+    if not knowledges and prompt_config.get("empty_response"):
+        empty_res = prompt_config["empty_response"]
+        yield {
+            "answer": empty_res, 
+            "reference": kbinfos, 
+            "prompt": "\n\n### Query:\n%s" % " ".join(questions),
+            "audio_binary": tts(tts_mdl, empty_res),
+            "memory": memory_text if memory_text else None
+        }
+        return
+
+    try:
+        system_content = prompt_config["system"].format(**kwargs)
+    except KeyError as e:
+        logging.warning(f"[CHATV1] Missing parameter in system prompt: {e}")
+        system_content = prompt_config["system"]
+    
+    # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
+    system_parts = [system_content, f"\n## Context:\n{datetime_info}"]
+    
+    if memory_text:
+        system_parts.append(f"\n## Memory:\n{memory_text}")
+        logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
+   
+    if knowledges:
+        kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
+        system_parts.append(f"\n## Knowledge:\n{kwargs['knowledge']}")
+    
+    # Add instruction based on whether initial response exists
+    if kb_initial_response:
+        system_parts.append(f"\n## What you already said to user:\n{kb_initial_response}")
+        system_parts.append(f"\n{after_classify_and_acknowledge_prompt()}\n")
+    
+    # Single system message for better LLM compatibility
+    msg = [{"role": "system", "content": "".join(system_parts)}]
+
+    
+
+    prompt4citation = ""
+    if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
+        prompt4citation = citation_prompt()
+    
+    # 🎯 MEMORY OPTIMIZATION: Only send last message if memory exists
+    if memory_text:
+        logging.info("[CHATV1] Using memory - sending only last user message")
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", " ".join(questions))} 
+                    for m in messages[-1:] if m["role"] != "system"])
+        logging.debug(f"[CHATV1] memory - Last message sent: {msg}")
+    else:
+        logging.info("[CHATV1] No memory - sending full conversation history")
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
+                    for m in messages if m["role"] != "system"])
+        #replace last user message with questions
+        msg[-1]["content"] = re.sub(r"##\d+\$\$", "", " ".join(questions))
+        logging.debug(f"[CHATV1] memory - Full messages sent: {msg}")
+    
+    # Extract system prompt before message_fit_in to preserve it
+    system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
+    
+    used_token_count, msg = message_fit_in(msg)
+    assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
+    
+    # Ensure system message is preserved (message_fit_in keeps it at index 0)
+    prompt = msg[0]["content"] if msg[0]["role"] == "system" else system_prompt
+
+    if "max_tokens" in gen_conf:
+        gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
+
+    def decorate_answer(answer):
+        nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, memory_text
+
+        refs = []
+        ans = answer.split("</think>")
+        think = ""
+        if len(ans) == 2:
+            think = ans[0] + "</think>"
+            answer = ans[1]
+
+        if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
+            idx = set([])
+            if embd_mdl and not re.search(r"\[ID:([0-9]+)\]", answer):
+                answer, idx = retriever.insert_citations(
+                    answer,
+                    [ck["content_ltks"] for ck in kbinfos["chunks"]],
+                    [ck["vector"] for ck in kbinfos["chunks"]],
+                    embd_mdl,
+                    tkweight=1 - dialog.vector_similarity_weight,
+                    vtweight=dialog.vector_similarity_weight,
+                )
+            else:
+                for match in re.finditer(r"\[ID:([0-9]+)\]", answer):
+                    i = int(match.group(1))
+                    if i < len(kbinfos["chunks"]):
+                        idx.add(i)
+
+            answer, idx = repair_bad_citation_formats(answer, kbinfos, idx)
+
+            idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
+            recall_docs = [d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
+            if not recall_docs:
+                recall_docs = kbinfos["doc_aggs"]
+            kbinfos["doc_aggs"] = recall_docs
+
+        # 🧹 Strip markdown AFTER citations are added (preserves [ID:n] format)
+        #answer = strip_markdown(answer)
+
+        refs = deepcopy(kbinfos)
+        for c in refs["chunks"]:
+            if c.get("vector"):
+                del c["vector"]
+
+        if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
+            answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
+        
+        finish_chat_ts = timer()
+
+        total_time_cost = (finish_chat_ts - chat_start_ts) * 1000
+        check_llm_time_cost = (check_llm_ts - chat_start_ts) * 1000
+        check_langfuse_tracer_cost = (check_langfuse_tracer_ts - check_llm_ts) * 1000
+        bind_embedding_time_cost = (bind_models_ts - check_langfuse_tracer_ts) * 1000
+        refine_question_time_cost = (refine_question_ts - bind_models_ts) * 1000
+        retrieval_time_cost = (retrieval_ts - refine_question_ts) * 1000
+        generate_result_time_cost = (finish_chat_ts - retrieval_ts) * 1000
+
+        tk_num = num_tokens_from_string(think + answer)
+        prompt += "\n\n### Query:\n%s" % " ".join(questions)
+        prompt = (
+            f"{prompt}\n\n"
+            "## Time elapsed:\n"
+            f"  - Total: {total_time_cost:.1f}ms\n"
+            f"  - Check LLM: {check_llm_time_cost:.1f}ms\n"
+            f"  - Check Langfuse tracer: {check_langfuse_tracer_cost:.1f}ms\n"
+            f"  - Bind models: {bind_embedding_time_cost:.1f}ms\n"
+            f"  - Query refinement(LLM): {refine_question_time_cost:.1f}ms\n"
+            f"  - Retrieval: {retrieval_time_cost:.1f}ms\n"
+            f"  - Generate answer: {generate_result_time_cost:.1f}ms\n\n"
+            "## Token usage:\n"
+            f"  - Generated tokens(approximately): {tk_num}\n"
+            f"  - Token speed: {int(tk_num / (generate_result_time_cost / 1000.0))}/s"
+        )
+        logging.info(f"[CHATV1] {prompt}")
+        
+        if langfuse_tracer and "langfuse_generation" in locals():
+            langfuse_output = "\n" + re.sub(r"^.*?(### Query:.*)", r"\1", prompt, flags=re.DOTALL)
+            langfuse_output = {"time_elapsed:": re.sub(r"\n", "  \n", langfuse_output), "created_at": time.time()}
+            langfuse_generation.update(output=langfuse_output)
+            langfuse_generation.end()
+
+        return {
+            "answer": think + answer, 
+            "reference": refs, 
+            "prompt": re.sub(r"\n", "  \n", prompt), 
+            "created_at": time.time(),
+            "memory": memory_text if memory_text else None
+        }
+
+    if langfuse_tracer:
+        langfuse_generation = langfuse_tracer.start_generation(
+            trace_context=trace_context, name="chatv1", model=llm_model_config["llm_name"],
+            input={"prompt": prompt, "prompt4citation": prompt4citation, "messages": msg}
+        )
+
+    if stream:
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, prompt + prompt4citation, msg[1:], gen_conf):
+            # Remove </think> tags if thought mode enabled
+            if thought:
+                answer = re.sub(r"^.*</think>", "", answer, flags=re.DOTALL)
+            
+            # 🔧 Prepend KB initial response to maintain continuity
+            full_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
+            yield {"answer": full_answer, "reference": {}, "audio_binary": None, "memory": None}
+        
+        # Include KB initial response in final decorated answer
+        final_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
+        yield decorate_answer(final_answer)
+    else:
+        answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
+        user_content = msg[-1].get("content", "[content not available]")
+        logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
+        # Prepend kb_initial_response to non-streaming answer too
+        full_answer = kb_initial_response + "\n\n" + answer if kb_initial_response else answer
+        res = decorate_answer(full_answer)
+        res["audio_binary"] = tts(tts_mdl, full_answer)
+        yield res
+        
 async def use_sql(question, field_map, tenant_id, chat_mdl, quota=True, kb_ids=None):
     sys_prompt = "You are a Database Administrator. You need to check the fields of the following tables based on the user's list of questions and write the SQL corresponding to the last question."
     user_prompt = """

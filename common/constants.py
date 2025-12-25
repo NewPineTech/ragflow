@@ -117,7 +117,6 @@ class FileSource(StrEnum):
     CONFLUENCE = "confluence"
     GMAIL = "gmail"
     GOOGLE_DRIVE = "google_drive"
-    GOOGLE_DRIVE = "google_drive"
     JIRA = "jira"
     SHAREPOINT = "sharepoint"
     SLACK = "slack"

@@ -33,7 +33,7 @@ from rag.prompts.generator import chunks_format
 
 
 use_v1 = True
-chat_func = chatv1 if use_v1 else chat
+async_chat_func = chatv1 if use_v1 else async_chat
 class ConversationService(CommonService):
     model = Conversation
 
