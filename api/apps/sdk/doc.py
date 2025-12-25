@@ -1354,6 +1354,7 @@ async def rm_chunk(tenant_id, dataset_id, document_id):
         raise LookupError(f"Can't find the document with ID {document_id}!")
     req = await get_request_json()
     condition = {"doc_id": document_id}
+    duplicate_messages = []
     if "chunk_ids" in req:
         unique_chunk_ids, duplicate_messages = check_duplicate_ids(req["chunk_ids"], "chunk")
         condition["id"] = unique_chunk_ids
