@@ -15,11 +15,10 @@
 #
 
 import argparse
+import asyncio
 import json
-from api import settings
 import networkx as nx
 import logging
-import trio
 
 from common.constants import LLMType
 from api.db.services.document_service import DocumentService
@@ -28,6 +27,7 @@ from api.db.services.llm_service import LLMBundle
 from api.db.services.user_service import TenantService
 from graphrag.general.index import update_graph
 from graphrag.light.graph_extractor import GraphExtractor
+from common import settings
 
 settings.init_settings()
 
@@ -93,4 +93,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    trio.run(main)
+    asyncio.run(main)

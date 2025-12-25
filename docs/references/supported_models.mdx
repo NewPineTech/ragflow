@@ -67,6 +67,7 @@ A complete list of models supported by RAGFlow, which will continue to expand.
 | 302.AI                | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |                    |                    |
 | CometAPI              | :heavy_check_mark: | :heavy_check_mark: |                    |                    |                    |                    |
 | DeerAPI               | :heavy_check_mark: | :heavy_check_mark: |                    | :heavy_check_mark: |                    | :heavy_check_mark: |
+| Jiekou.AI             | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |                    |                    |                    |
 
 ```mdx-code-block
 </APITable>
@@ -75,6 +76,19 @@ A complete list of models supported by RAGFlow, which will continue to expand.
 :::danger IMPORTANT
 If your model is not listed here but has APIs compatible with those of OpenAI, click **OpenAI-API-Compatible** on the **Model providers** page to configure your model.
 :::
+
+## Example: AI Badgr (OpenAI-compatible)
+
+You can use **AI Badgr** with RAGFlow via the existing OpenAI-API-Compatible provider.
+
+To configure AI Badgr:
+
+- **Provider**: `OpenAI-API-Compatible`
+- **Base URL**: `https://aibadgr.com/api/v1`
+- **API Key**: your AI Badgr API key (from the AI Badgr dashboard)
+- **Model**: any AI Badgr chat or embedding model ID, as exposed by AI Badgr's OpenAI-compatible APIs
+
+AI Badgr implements OpenAI-compatible endpoints for `/v1/chat/completions`, `/v1/embeddings`, and `/v1/models`, so no additional code changes in RAGFlow are required.
 
 :::note
 The list of supported models is extracted from [this source](https://github.com/infiniflow/ragflow/blob/main/rag/llm/__init__.py) and may not be the most current. For the latest supported model list, please refer to the Python file.

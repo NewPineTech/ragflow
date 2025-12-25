@@ -121,7 +121,7 @@ class PipelineOperationLogService(CommonService):
         else:
             ok, kb_info = KnowledgebaseService.get_by_id(document.kb_id)
             if not ok:
-                raise RuntimeError(f"Cannot find knowledge base {document.kb_id} for referred_document {referred_document_id}")
+                raise RuntimeError(f"Cannot find dataset {document.kb_id} for referred_document {referred_document_id}")
 
             tenant_id = kb_info.tenant_id
             title = document.parser_id
@@ -159,7 +159,7 @@ class PipelineOperationLogService(CommonService):
             document_name=document.name,
             document_suffix=document.suffix,
             document_type=document.type,
-            source_from="",  # TODO: add in the future
+            source_from=document.source_type.split("/")[0],
             progress=document.progress,
             progress_msg=document.progress_msg,
             process_begin_at=document.process_begin_at,

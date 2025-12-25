@@ -31,26 +31,81 @@ except ImportError:
     Solar = None
 
 from agentic_reasoning import DeepResearcher
-from api import settings
+from api.db.services.file_service import FileService
 from common.constants import LLMType, ParserType, StatusEnum
+from common import settings
 from api.db.db_models import DB, Dialog
 from api.db.services.common_service import CommonService
 from api.db.services.document_service import DocumentService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.langfuse_service import TenantLangfuseService
 from api.db.services.llm_service import LLMBundle
+from common.metadata_utils import apply_meta_data_filter
 from api.db.services.tenant_llm_service import TenantLLMService
 from common.time_utils import current_timestamp, datetime_format
 from graphrag.general.mind_map_extractor import MindMapExtractor
 from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
 from rag.nlp.search import index_name
-from rag.prompts.generator import after_classify_and_acknowledge_prompt, chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
-     gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, question_classify_prompt, classify_and_respond_prompt
+from rag.prompts.generator import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in, \
+    gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, classify_and_respond_prompt, after_classify_and_acknowledge_prompt
 from common.token_utils import num_tokens_from_string
 from rag.utils.tavily_conn import Tavily
 from common.string_utils import remove_redundant_spaces
-from rag.utils.redis_conn import REDIS_CONN
+
+
+def get_current_datetime_info():
+    """
+    Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
+    Returns: String chứa thông tin ngày giờ
+    """
+    from datetime import timezone, timedelta
+    
+    # Chuyển sang múi giờ GMT+7 (Việt Nam)
+    gmt7 = timezone(timedelta(hours=7))
+    now = datetime.now(gmt7)
+    
+    # Ngày dương lịch
+    solar_date = now.strftime("%d/%m/%Y")
+    current_time = now.strftime("%H:%M:%S")
+    weekday = now.strftime("%A")
+    weekday_vi = {
+        "Monday": "Thứ Hai",
+        "Tuesday": "Thứ Ba", 
+        "Wednesday": "Thứ Tư",
+        "Thursday": "Thứ Năm",
+        "Friday": "Thứ Sáu",
+        "Saturday": "Thứ Bảy",
+        "Sunday": "Chủ Nhật"
+    }
+
+    solar_day = now.strftime("%d")
+    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_day}, tháng {now.month}, năm {now.year}, lúc {current_time}."
+
+    # Thêm ngày âm lịch nếu có thư viện
+    if Converter and Solar:
+        try:
+            solar = Solar(now.year, now.month, now.day)
+            lunar = Converter.Solar2Lunar(solar)
+            
+            # Tính năm Can Chi
+            # Can: Giáp, Ất, Bính, Đinh, Mậu, Kỷ, Canh, Tân, Nhâm, Quý (10 can)
+            # Chi: Tý, Sửu, Dần, Mão, Thìn, Tỵ, Ngọ, Mùi, Thân, Dậu, Tuất, Hợi (12 chi)
+            # Công thức: Can = (year - 4) % 10, Chi = (year - 4) % 12
+            # Năm 2024 = Giáp Thìn (2024 - 4 = 2020, 2020 % 10 = 0 -> Giáp, 2020 % 12 = 4 -> Thìn)
+            # Năm 2025 = Ất Tỵ (2025 - 4 = 2021, 2021 % 10 = 1 -> Ất, 2021 % 12 = 5 -> Tỵ)
+            can = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
+            chi = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+            can_index = (now.year - 4) % 10
+            chi_index = (now.year - 4) % 12
+            nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
+            
+            datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
+        except Exception as e:
+            logging.debug(f"Could not convert to lunar calendar: {e}")
+    
+    return datetime_info
+
 
 
 class DialogService(CommonService):
@@ -185,6 +240,7 @@ class DialogService(CommonService):
         return res
 
 
+
 def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, min_delta_len=3):
     """
     🚀 UNIFIED STREAMING CORE: Stream LLM with delta length check
@@ -202,7 +258,7 @@ def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, mi
     last_ans = ""
     answer = ""
     
-    for ans in chat_mdl.chat_streamly(system_content, messages, gen_conf):
+    for ans in chat_mdl._sync_from_async_stream(chat_mdl.async_chat_streamly, system_content, messages, gen_conf):
         answer = ans
         delta_ans = answer[len(last_ans):]
         
@@ -216,60 +272,6 @@ def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, mi
     if len(answer) > len(last_ans):
         delta_ans = answer[len(last_ans):]
         yield (answer, delta_ans, True)
-
-
-def get_current_datetime_info():
-    """
-    Lấy thông tin ngày giờ hiện tại bao gồm cả ngày âm lịch.
-    Returns: String chứa thông tin ngày giờ
-    """
-    from datetime import timezone, timedelta
-    
-    # Chuyển sang múi giờ GMT+7 (Việt Nam)
-    gmt7 = timezone(timedelta(hours=7))
-    now = datetime.now(gmt7)
-    
-    # Ngày dương lịch
-    solar_date = now.strftime("%d/%m/%Y")
-    current_time = now.strftime("%H:%M:%S")
-    weekday = now.strftime("%A")
-    weekday_vi = {
-        "Monday": "Thứ Hai",
-        "Tuesday": "Thứ Ba", 
-        "Wednesday": "Thứ Tư",
-        "Thursday": "Thứ Năm",
-        "Friday": "Thứ Sáu",
-        "Saturday": "Thứ Bảy",
-        "Sunday": "Chủ Nhật"
-    }
-
-    solar_day = now.strftime("%d")
-    datetime_info = f"Hôm nay là {weekday_vi.get(weekday, weekday)}, ngày {solar_day}, tháng {now.month}, năm {now.year}, lúc {current_time}."
-
-    # Thêm ngày âm lịch nếu có thư viện
-    if Converter and Solar:
-        try:
-            solar = Solar(now.year, now.month, now.day)
-            lunar = Converter.Solar2Lunar(solar)
-            
-            # Tính năm Can Chi
-            # Can: Giáp, Ất, Bính, Đinh, Mậu, Kỷ, Canh, Tân, Nhâm, Quý (10 can)
-            # Chi: Tý, Sửu, Dần, Mão, Thìn, Tỵ, Ngọ, Mùi, Thân, Dậu, Tuất, Hợi (12 chi)
-            # Công thức: Can = (year - 4) % 10, Chi = (year - 4) % 12
-            # Năm 2024 = Giáp Thìn (2024 - 4 = 2020, 2020 % 10 = 0 -> Giáp, 2020 % 12 = 4 -> Thìn)
-            # Năm 2025 = Ất Tỵ (2025 - 4 = 2021, 2021 % 10 = 1 -> Ất, 2021 % 12 = 5 -> Tỵ)
-            can = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
-            chi = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
-            can_index = (now.year - 4) % 10
-            chi_index = (now.year - 4) % 12
-            nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
-            
-            datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
-        except Exception as e:
-            logging.debug(f"Could not convert to lunar calendar: {e}")
-    
-    return datetime_info
-
 
 def classify_and_respond(dialog, messages, stream=True):
     """
@@ -472,80 +474,9 @@ def repair_bad_citation_formats(answer: str, kbinfos: dict, idx: set):
     return answer, idx
 
 
-def convert_conditions(metadata_condition):
-    if metadata_condition is None:
-        metadata_condition = {}
-    op_mapping = {
-        "is": "=",
-        "not is": "≠"
-    }
-    return [
-        {
-            "op": op_mapping.get(cond["comparison_operator"], cond["comparison_operator"]),
-            "key": cond["name"],
-            "value": cond["value"]
-        }
-        for cond in metadata_condition.get("conditions", [])
-    ]
-
-
-def meta_filter(metas: dict, filters: list[dict]):
-    doc_ids = set([])
-
-    def filter_out(v2docs, operator, value):
-        ids = []
-        for input, docids in v2docs.items():
-            try:
-                input = float(input)
-                value = float(value)
-            except Exception:
-                input = str(input)
-                value = str(value)
-
-            for conds in [
-                (operator == "contains", str(value).lower() in str(input).lower()),
-                (operator == "not contains", str(value).lower() not in str(input).lower()),
-                (operator == "start with", str(input).lower().startswith(str(value).lower())),
-                (operator == "end with", str(input).lower().endswith(str(value).lower())),
-                (operator == "empty", not input),
-                (operator == "not empty", input),
-                (operator == "=", input == value),
-                (operator == "≠", input != value),
-                (operator == ">", input > value),
-                (operator == "<", input < value),
-                (operator == "≥", input >= value),
-                (operator == "≤", input <= value),
-            ]:
-                try:
-                    if all(conds):
-                        ids.extend(docids)
-                        break
-                except Exception:
-                    pass
-        return ids
-
-    for k, v2docs in metas.items():
-        for f in filters:
-            if k != f["key"]:
-                continue
-            ids = filter_out(v2docs, f["op"], f["value"])
-            if not doc_ids:
-                doc_ids = set(ids)
-            else:
-                doc_ids = doc_ids & set(ids)
-            if not doc_ids:
-                return []
-    return list(doc_ids)
-
-
-def chat(dialog, messages, stream=True, **kwargs):
+async def async_chat(dialog, messages, stream=True, **kwargs):
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
-
-    current_message=messages[-1]["content"]
-    classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
-    print("Classify:", classify) #Classify: ['GREET']
-    if (classify == "GREET" or classify=="SENSITIVE") or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
-        print("Use solo chat for greeting or sensitive question or no knowledge base.")
+    if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
         for ans in chat_solo(dialog, messages, stream):
             yield ans
         return
@@ -592,15 +523,18 @@ def chat(dialog, messages, stream=True, **kwargs):
     retriever = settings.retriever
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
+    attachments_= ""
     if "doc_ids" in messages[-1]:
         attachments = messages[-1]["doc_ids"]
+    if "files" in messages[-1]:
+        attachments_ = "\n\n".join(FileService.get_files(messages[-1]["files"]))
 
     prompt_config = dialog.prompt_config
     field_map = KnowledgebaseService.get_field_map(dialog.kb_ids)
     # try to use sql if field mapping is good to go
     if field_map:
         logging.debug("Use SQL to retrieval:{}".format(questions[-1]))
-        ans = use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
+        ans = await use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
         if ans:
             yield ans
             return
@@ -616,29 +550,27 @@ def chat(dialog, messages, stream=True, **kwargs):
     memory_text = kwargs.pop("short_memory", None)
   
     if len(questions) > 1 and prompt_config.get("refine_multiturn"):
-        questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
+        questions = [await full_question(dialog.tenant_id, dialog.llm_id, messages)]
     else:
         questions = questions[-1:]
 
     logging.info("Final questions: {}, memory: {} ".format(" ".join(questions), memory_text))
    
     if prompt_config.get("cross_languages"):
-        questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
+        questions = [await cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
 
     if dialog.meta_data_filter:
         metas = DocumentService.get_meta_by_kbs(dialog.kb_ids)
-        if dialog.meta_data_filter.get("method") == "auto":
-            filters = gen_meta_filter(chat_mdl, metas, questions[-1])
-            attachments.extend(meta_filter(metas, filters))
-            if not attachments:
-                attachments = None
-        elif dialog.meta_data_filter.get("method") == "manual":
-            attachments.extend(meta_filter(metas, dialog.meta_data_filter["manual"]))
-            if not attachments:
-                attachments = None
+        attachments = await apply_meta_data_filter(
+            dialog.meta_data_filter,
+            metas,
+            questions[-1],
+            chat_mdl,
+            attachments,
+        )
 
     if prompt_config.get("keyword", False):
-        questions[-1] += keyword_extraction(chat_mdl, questions[-1])
+        questions[-1] += await keyword_extraction(chat_mdl, questions[-1])
 
     refine_question_ts = timer()
 
@@ -666,7 +598,7 @@ def chat(dialog, messages, stream=True, **kwargs):
                 ),
             )
 
-            for think in reasoner.thinking(kbinfos, " ".join(questions)):
+            async for think in reasoner.thinking(kbinfos, attachments_ + " ".join(questions)):
                 if isinstance(think, str):
                     thought = think
                     knowledges = [t for t in think.split("\n") if t]
@@ -693,6 +625,7 @@ def chat(dialog, messages, stream=True, **kwargs):
                     cks = retriever.retrieval_by_toc(" ".join(questions), kbinfos["chunks"], tenant_ids, chat_mdl, dialog.top_n)
                     if cks:
                         kbinfos["chunks"] = cks
+                kbinfos["chunks"] = retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
             if prompt_config.get("tavily_api_key"):
                 tav = Tavily(prompt_config["tavily_api_key"])
                 tav_res = tav.retrieve_chunks(" ".join(questions))
@@ -713,7 +646,8 @@ def chat(dialog, messages, stream=True, **kwargs):
         empty_res = prompt_config["empty_response"]
         yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions),
                "audio_binary": tts(tts_mdl, empty_res)}
-        return {"answer": prompt_config["empty_response"], "reference": kbinfos}
+        yield {"answer": prompt_config["empty_response"], "reference": kbinfos}
+        return
 
     kwargs["knowledge"] = ""
     # Thêm thông tin ngày giờ hiện tại
@@ -722,27 +656,7 @@ def chat(dialog, messages, stream=True, **kwargs):
      
     gen_conf = dialog.llm_setting
 
-    try:
-        system_content = prompt_config["system"].format(**kwargs)
-    except KeyError as e:
-        # Nếu còn placeholder chưa được thay thế, dùng giá trị rỗng
-        logging.warning(f"Missing parameter in system prompt: {e}")
-        system_content = prompt_config["system"]
-    
-    # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
-    system_parts = [system_content, f"\n## Context:{datetime_info}"]
-    
-    if memory_text:
-        system_parts.append(f"\n##Memory: {memory_text}")
-        logging.info(f"Memory added to message: {memory_text[:100]}...")
-   
-    if knowledges:
-        kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        system_parts.append(f"\n## Knowledge Context: {kwargs['knowledge']}")
-    
-    # Single system message for better LLM compatibility
-    msg = [{"role": "system", "content": "".join(system_parts)}]
-
+    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
@@ -860,8 +774,7 @@ def chat(dialog, messages, stream=True, **kwargs):
     if stream:
         last_ans = ""
         answer = ""
-        
-        for ans in chat_mdl.chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
+        async for ans in chat_mdl.async_chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
             answer = ans
@@ -883,61 +796,14 @@ def chat(dialog, messages, stream=True, **kwargs):
             yield {"answer": combined_answer, "reference": {}, "audio_binary": None}
         yield decorate_answer(thought + answer)
     else:
-        answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
+        answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
         res["audio_binary"] = tts(tts_mdl, answer)
         yield res
 
-def strip_markdown(text):
-        """
-        Remove markdown formatting while preserving citations [ID:n].
-        Strips: **bold**, *italic*, __underline__, ~~strikethrough~~, #headers, etc.
-        """
-        # Preserve citations by replacing temporarily
-        citation_placeholder = {}
-        citation_pattern = r'\[ID:\d+\]'
-        for i, match in enumerate(re.finditer(citation_pattern, text)):
-            placeholder = f"__CITATION_{i}__"
-            citation_placeholder[placeholder] = match.group(0)
-            text = text.replace(match.group(0), placeholder, 1)
-        
-        # Remove markdown formatting
-        # Headers (##, ###, etc.)
-        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-        # Bold (**text** or __text__)
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-        text = re.sub(r'__(.+?)__', r'\1', text)
-        # Italic (*text* or _text_)
-        text = re.sub(r'\*(.+?)\*', r'\1', text)
-        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
-        # Strikethrough (~~text~~)
-        text = re.sub(r'~~(.+?)~~', r'\1', text)
-        # Code blocks (```code```)
-        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-        # Inline code (`code`)
-        text = re.sub(r'`(.+?)`', r'\1', text)
-        # Links ([text](url))
-        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-        # Images (![alt](url))
-        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
-        # Blockquotes (> text)
-        text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
-        # Horizontal rules (---, ***, ___)
-        text = re.sub(r'^[-*_]{3,}$', '', text, flags=re.MULTILINE)
-        # Lists (- item, * item, 1. item)
-        text = re.sub(r'^[\s]*[-*+]\s+', '', text, flags=re.MULTILINE)
-        text = re.sub(r'^[\s]*\d+\.\s+', '', text, flags=re.MULTILINE)
-        
-        # Restore citations
-        for placeholder, citation in citation_placeholder.items():
-            text = text.replace(placeholder, citation)
-        
-        return text
-
-
-def chatv1(dialog, messages, stream=True, **kwargs):
+async def chatv1(dialog, messages, stream=True, **kwargs):
     """
     Optimized chat function with intelligent streaming (V1)
     
@@ -1084,14 +950,14 @@ def chatv1(dialog, messages, stream=True, **kwargs):
     
    
     if len(questions) > 1:   #and prompt_config.get("refine_multiturn"):
-        questions = [full_question(dialog.tenant_id, dialog.llm_id, messages)]
+        questions = [chat_mdl._run_coroutine_sync(full_question(dialog.tenant_id, dialog.llm_id, messages, chat_mdl=chat_mdl))]
     else:
         questions = questions[-1:]
 
     logging.info("[CHATV1] Questions: {}, Memory: {}".format(" ".join(questions), "Yes" if memory_text else "No"))
    
     if prompt_config.get("cross_languages"):
-        questions = [cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"])]
+        questions = [chat_mdl._run_coroutine_sync(cross_languages(dialog.tenant_id, dialog.llm_id, questions[0], prompt_config["cross_languages"]))]
 
     if dialog.meta_data_filter:
         metas = DocumentService.get_meta_by_kbs(dialog.kb_ids)
@@ -1330,7 +1196,7 @@ def chatv1(dialog, messages, stream=True, **kwargs):
             kbinfos["doc_aggs"] = recall_docs
 
         # 🧹 Strip markdown AFTER citations are added (preserves [ID:n] format)
-        answer = strip_markdown(answer)
+        #answer = strip_markdown(answer)
 
         refs = deepcopy(kbinfos)
         for c in refs["chunks"]:
@@ -1410,9 +1276,8 @@ def chatv1(dialog, messages, stream=True, **kwargs):
         res = decorate_answer(full_answer)
         res["audio_binary"] = tts(tts_mdl, full_answer)
         yield res
-
-
-def use_sql(question, field_map, tenant_id, chat_mdl, quota=True, kb_ids=None):
+        
+async def use_sql(question, field_map, tenant_id, chat_mdl, quota=True, kb_ids=None):
     sys_prompt = "You are a Database Administrator. You need to check the fields of the following tables based on the user's list of questions and write the SQL corresponding to the last question."
     user_prompt = """
 Table name: {};
@@ -1425,15 +1290,16 @@ Please write the SQL, only SQL, without any other explanations or text.
 """.format(index_name(tenant_id), "\n".join([f"{k}: {v}" for k, v in field_map.items()]), question)
     tried_times = 0
 
-    def get_table():
+    async def get_table():
         nonlocal sys_prompt, user_prompt, question, tried_times
-        sql = chat_mdl.chat(sys_prompt, [{"role": "user", "content": user_prompt}], {"temperature": 0.06})
+        sql = await chat_mdl.async_chat(sys_prompt, [{"role": "user", "content": user_prompt}], {"temperature": 0.06})
         sql = re.sub(r"^.*</think>", "", sql, flags=re.DOTALL)
         logging.debug(f"{question} ==> {user_prompt} get SQL: {sql}")
         sql = re.sub(r"[\r\n]+", " ", sql.lower())
         sql = re.sub(r".*select ", "select ", sql.lower())
         sql = re.sub(r" +", " ", sql)
         sql = re.sub(r"([;；]|```).*", "", sql)
+        sql = re.sub(r"&", "and", sql)
         if sql[: len("select ")] != "select ":
             return None, None
         if not re.search(r"((sum|avg|max|min)\(|group by )", sql.lower()):
@@ -1452,7 +1318,11 @@ Please write the SQL, only SQL, without any other explanations or text.
         if kb_ids:
             kb_filter = "(" + " OR ".join([f"kb_id = '{kb_id}'" for kb_id in kb_ids]) + ")"
             if "where" not in sql.lower():
-                sql += f" WHERE {kb_filter}"
+                o = sql.lower().split("order by")
+                if len(o) > 1:
+                    sql = o[0] + f" WHERE {kb_filter}  order by " + o[1]
+                else:
+                    sql += f" WHERE {kb_filter}"
             else:
                 sql += f" AND {kb_filter}"
 
@@ -1460,10 +1330,9 @@ Please write the SQL, only SQL, without any other explanations or text.
         tried_times += 1
         return settings.retriever.sql_retrieval(sql, format="json"), sql
 
-    tbl, sql = get_table()
-    if tbl is None:
-        return None
-    if tbl.get("error") and tried_times <= 2:
+    try:
+        tbl, sql = await get_table()
+    except Exception as e:
         user_prompt = """
         Table name: {};
         Table of database fields are as follows:
@@ -1477,16 +1346,14 @@ Please write the SQL, only SQL, without any other explanations or text.
         The SQL error you provided last time is as follows:
         {}
 
-        Error issued by database as follows:
-        {}
-
         Please correct the error and write SQL again, only SQL, without any other explanations or text.
-        """.format(index_name(tenant_id), "\n".join([f"{k}: {v}" for k, v in field_map.items()]), question, sql, tbl["error"])
-        tbl, sql = get_table()
-        logging.debug("TRY it again: {}".format(sql))
+        """.format(index_name(tenant_id), "\n".join([f"{k}: {v}" for k, v in field_map.items()]), question, e)
+        try:
+            tbl, sql = await get_table()
+        except Exception:
+            return
 
-    logging.debug("GET table: {}".format(tbl))
-    if tbl.get("error") or len(tbl["rows"]) == 0:
+    if len(tbl["rows"]) == 0:
         return None
 
     docid_idx = set([ii for ii, c in enumerate(tbl["columns"]) if c["name"] == "doc_id"])
@@ -1530,17 +1397,51 @@ Please write the SQL, only SQL, without any other explanations or text.
         "prompt": sys_prompt,
     }
 
+def clean_tts_text(text: str) -> str:
+    if not text:
+        return ""
+
+    text = text.encode("utf-8", "ignore").decode("utf-8", "ignore")
+
+    text = re.sub(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "", text)
+
+    emoji_pattern = re.compile(
+        "[\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002700-\U000027BF"
+        "\U0001F900-\U0001F9FF"
+        "\U0001FA70-\U0001FAFF"
+        "\U0001FAD0-\U0001FAFF]+",
+        flags=re.UNICODE
+    )
+    text = emoji_pattern.sub("", text)
+
+    text = re.sub(r"\s+", " ", text).strip()
+
+    MAX_LEN = 500
+    if len(text) > MAX_LEN:
+        text = text[:MAX_LEN]
+
+    return text
 
 def tts(tts_mdl, text):
     if not tts_mdl or not text:
-        return
+        return None
+    text = clean_tts_text(text)
+    if not text:
+        return None
     bin = b""
-    for chunk in tts_mdl.tts(text):
-        bin += chunk
+    try:
+        for chunk in tts_mdl.tts(text):
+            bin += chunk
+    except Exception as e:
+        logging.error(f"TTS failed: {e}, text={text!r}")
+        return None
     return binascii.hexlify(bin).decode("utf-8")
 
-
-def ask(question, kb_ids, tenant_id, chat_llm_name=None, search_config={}):
+async def async_ask(question, kb_ids, tenant_id, chat_llm_name=None, search_config={}):
     doc_ids = search_config.get("doc_ids", [])
     rerank_mdl = None
     kb_ids = search_config.get("kb_ids", kb_ids)
@@ -1563,15 +1464,7 @@ def ask(question, kb_ids, tenant_id, chat_llm_name=None, search_config={}):
 
     if meta_data_filter:
         metas = DocumentService.get_meta_by_kbs(kb_ids)
-        if meta_data_filter.get("method") == "auto":
-            filters = gen_meta_filter(chat_mdl, metas, question)
-            doc_ids.extend(meta_filter(metas, filters))
-            if not doc_ids:
-                doc_ids = None
-        elif meta_data_filter.get("method") == "manual":
-            doc_ids.extend(meta_filter(metas, meta_data_filter["manual"]))
-            if not doc_ids:
-                doc_ids = None
+        doc_ids = await apply_meta_data_filter(meta_data_filter, metas, question, chat_mdl, doc_ids)
 
     kbinfos = retriever.retrieval(
         question=question,
@@ -1614,13 +1507,13 @@ def ask(question, kb_ids, tenant_id, chat_llm_name=None, search_config={}):
         return {"answer": answer, "reference": refs}
 
     answer = ""
-    for ans in chat_mdl.chat_streamly(sys_prompt, msg, {"temperature": 0.1}):
+    async for ans in chat_mdl.async_chat_streamly(sys_prompt, msg, {"temperature": 0.1}):
         answer = ans
         yield {"answer": answer, "reference": {}}
     yield decorate_answer(answer)
 
 
-def gen_mindmap(question, kb_ids, tenant_id, search_config={}):
+async def gen_mindmap(question, kb_ids, tenant_id, search_config={}):
     meta_data_filter = search_config.get("meta_data_filter", {})
     doc_ids = search_config.get("doc_ids", [])
     rerank_id = search_config.get("rerank_id", "")
@@ -1638,15 +1531,7 @@ def gen_mindmap(question, kb_ids, tenant_id, search_config={}):
 
     if meta_data_filter:
         metas = DocumentService.get_meta_by_kbs(kb_ids)
-        if meta_data_filter.get("method") == "auto":
-            filters = gen_meta_filter(chat_mdl, metas, question)
-            doc_ids.extend(meta_filter(metas, filters))
-            if not doc_ids:
-                doc_ids = None
-        elif meta_data_filter.get("method") == "manual":
-            doc_ids.extend(meta_filter(metas, meta_data_filter["manual"]))
-            if not doc_ids:
-                doc_ids = None
+        doc_ids = await apply_meta_data_filter(meta_data_filter, metas, question, chat_mdl, doc_ids)
 
     ranks = settings.retriever.retrieval(
         question=question,
@@ -1664,5 +1549,5 @@ def gen_mindmap(question, kb_ids, tenant_id, search_config={}):
         rank_feature=label_question(question, kbs),
     )
     mindmap = MindMapExtractor(chat_mdl)
-    mind_map = trio.run(mindmap, [c["content_with_weight"] for c in ranks["chunks"]])
+    mind_map = await mindmap([c["content_with_weight"] for c in ranks["chunks"]])
     return mind_map.output

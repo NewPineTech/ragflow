@@ -18,10 +18,10 @@
 import logging
 import os
 import json
-from flask import request
+from quart import request
 from peewee import OperationalError
 from api.db.db_models import File
-from api.db.services.document_service import DocumentService, queue_raptor_o_graphrag_tasks
+from api.db.services.document_service import DocumentService, queue_raptor_o_graphrag_tasks, queue_raptor_o_graphrag_tasks
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
 from api.db.services.knowledgebase_service import KnowledgebaseService
@@ -49,7 +49,7 @@ from api.utils.validation_utils import (
 )
 from rag.nlp import search
 from common.constants import PAGERANK_FLD
-from api import settings
+from common import settings
 
 
 @manager.route("/datasets", methods=["POST"])  # noqa: F821

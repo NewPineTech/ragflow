@@ -94,3 +94,4 @@ def get_svr_queue_name(priority: int) -> str:
 
 def get_svr_queue_names():
     return [get_svr_queue_name(priority) for priority in [1, 0]]
+

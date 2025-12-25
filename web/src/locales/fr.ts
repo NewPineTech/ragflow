@@ -526,6 +526,10 @@ export default {
         'Pour les utilisateurs chinois, pas besoin de remplir ou utiliser https://dashscope.aliyuncs.com/compatible-mode/v1. Pour les utilisateurs internationaux, utilisez https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
       tongyiBaseUrlPlaceholder:
         "(Utilisateurs internationaux uniquement, veuillez consulter l'astuce)",
+      minimaxBaseUrlTip:
+        'Utilisateurs internationaux uniquement : utilisez https://api.minimax.io/v1.',
+      minimaxBaseUrlPlaceholder:
+        '(Utilisateurs internationaux uniquement, renseignez https://api.minimax.io/v1)',
       modify: 'Modifier',
       systemModelSettings: 'Définir les modèles par défaut',
       chatModel: 'Modèle de chat',
@@ -784,15 +788,31 @@ export default {
         'Un composant qui recherche sur baidu.com, utilisant TopN pour spécifier le nombre de résultats. Il complète les bases de connaissances existantes.',
       duckDuckGo: 'DuckDuckGo',
       duckDuckGoDescription:
-        'Un composant qui recherche sur duckduckgo.com, vous permettant de spécifier le nombre de résultats avec TopN. Il complète les bases de connaissances existantes.',
+        'Un composant qui recherche sur duckduckgo.com, vous permettant de spécifier le nombre de résultats de recherche avec TopN. Il complète les bases de connaissances existantes.',
       searXNG: 'SearXNG',
       searXNGDescription:
         "Un composant qui effectue des recherches via la URL de l'instance de SearXNG que vous fournissez. Spécifiez TopN et l'URL de l'instance.",
-      channel: 'Canal',
-      channelTip:
-        "Effectuer une recherche de texte ou d'actualités sur l'entrée du composant",
-      text: 'Texte',
-      news: 'Actualités',
+      pdfGenerator: 'Générateur de Documents',
+      pDFGenerator: 'Générateur de Documents',
+      pdfGeneratorDescription: `Un composant qui génère des documents (PDF, DOCX, TXT) à partir de contenu formaté en markdown avec un style personnalisable, des images et des tableaux. Prend en charge : **gras**, *italique*, # titres, - listes, tableaux avec syntaxe |.`,
+      pDFGeneratorDescription: `Un composant qui génère des documents (PDF, DOCX, TXT) à partir de contenu formaté en markdown avec un style personnalisable, des images et des tableaux. Prend en charge : **gras**, *italique*, # titres, - listes, tableaux avec syntaxe |.`,
+      subtitle: 'Sous-titre',
+      logoImage: 'Image Logo',
+      logoPosition: 'Position Logo',
+      logoWidth: 'Largeur Logo',
+      logoHeight: 'Hauteur Logo',
+      fontFamily: 'Famille Police',
+      fontSize: 'Taille Police',
+      titleFontSize: 'Taille Police Titre',
+      pageSize: 'Taille Page',
+      orientation: 'Orientation',
+      marginTop: 'Marge Supérieure',
+      marginBottom: 'Marge Inférieure',
+      filename: 'Nom Fichier',
+      outputDirectory: 'Répertoire Sortie',
+      addPageNumbers: 'Ajouter Numéros Page',
+      addTimestamp: 'Ajouter Timestamp',
+      watermarkText: 'Texte Filigrane',
       messageHistoryWindowSize:
         "Taille de la fenêtre d'historique des messages",
       messageHistoryWindowSizeTip:
@@ -1154,7 +1174,6 @@ export default {
       },
       addVariable: 'Ajouter une variable',
       variableSettings: 'Paramètres des variables',
-      globalVariables: 'Variables globales',
       systemPrompt: 'Invite système',
       addCategory: 'Ajouter une catégorie',
       categoryName: 'Nom de la catégorie',
@@ -1170,7 +1189,6 @@ export default {
       datatype: 'Type MIME de la requête HTTP',
       insertVariableTip: `Entrer / Insérer des variables`,
       historyversion: 'Historique des versions',
-      filename: 'Nom du fichier',
       version: {
         created: 'Créé',
         details: 'Détails de la version',

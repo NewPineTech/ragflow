@@ -1,4 +1,5 @@
-import { LlmItem, useSelectLlmList } from '@/hooks/llm-hooks';
+import { LlmItem, useSelectLlmList } from '@/hooks/use-llm-request';
+import { t } from 'i18next';
 import { ModelProviderCard } from './modal-card';
 
 export const UsedModel = ({
@@ -8,10 +9,12 @@ export const UsedModel = ({
   handleAddModel: (factory: string) => void;
   handleEditModel: (model: any, factory: LlmItem) => void;
 }) => {
-  const { factoryList, myLlmList: llmList, loading } = useSelectLlmList();
+  const { myLlmList: llmList } = useSelectLlmList();
   return (
-    <div className="flex flex-col w-full gap-4 mb-4">
-      <div className="text-text-primary text-2xl mb-2 mt-4">Added models</div>
+    <div className="flex flex-col w-full gap-5 mb-4">
+      <div className="text-text-primary text-2xl font-medium mb-2 mt-4">
+        {t('setting.addedModels')}
+      </div>
       {llmList.map((llm) => {
         return (
           <ModelProviderCard

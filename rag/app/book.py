@@ -20,10 +20,11 @@ from io import BytesIO
 
 from deepdoc.parser.utils import get_text
 from rag.app import naive
-from rag.app.naive import plaintext_parser, PARSERS
+from rag.app.naive import by_plaintext, PARSERS
+from common.parser_config_utils import normalize_layout_recognizer
 from rag.nlp import bullets_category, is_english,remove_contents_table, \
     hierarchical_merge, make_colon_as_title, naive_merge, random_choices, tokenize_table, \
-    tokenize_chunks
+    tokenize_chunks, attach_media_context
 from rag.nlp import rag_tokenizer
 from deepdoc.parser import PdfParser, HtmlParser
 from deepdoc.parser.figure_parser import vision_figure_parser_docx_wrapper
@@ -70,7 +71,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
     """
         Supported file formats are docx, pdf, txt.
         Since a book is long and not all the parts are useful, if it's a PDF,
-        please setup the page ranges for every book in order eliminate negative effects and save elapsed computing time.
+        please set up the page ranges for every book in order eliminate negative effects and save elapsed computing time.
     """
     parser_config = kwargs.get(
         "parser_config", {
@@ -90,22 +91,24 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
             filename, binary=binary, from_page=from_page, to_page=to_page)
         remove_contents_table(sections, eng=is_english(
             random_choices([t for t, _ in sections], k=200)))
-        tbls=vision_figure_parser_docx_wrapper(sections=sections,tbls=tbls,callback=callback,**kwargs)
+        tbls = vision_figure_parser_docx_wrapper(sections=sections,tbls=tbls,callback=callback,**kwargs)
         # tbls = [((None, lns), None) for lns in tbls]
         sections=[(item[0],item[1] if item[1] is not None else "") for item in sections if not isinstance(item[1], Image.Image)]
         callback(0.8, "Finish parsing.")
 
     elif re.search(r"\.pdf$", filename, re.IGNORECASE):
-        layout_recognizer = parser_config.get("layout_recognize", "DeepDOC")
+        layout_recognizer, parser_model_name = normalize_layout_recognizer(
+            parser_config.get("layout_recognize", "DeepDOC")
+        )
 
         if isinstance(layout_recognizer, bool):
             layout_recognizer = "DeepDOC" if layout_recognizer else "Plain Text"
 
         name = layout_recognizer.strip().lower()
-        parser = PARSERS.get(name, plaintext_parser)
+        parser = PARSERS.get(name, by_plaintext)
         callback(0.1, "Start to parse.")
 
-        sections, tables, _ = parser(
+        sections, tables, pdf_parser = parser(
             filename = filename,
             binary = binary,
             from_page = from_page,
@@ -113,6 +116,8 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
             lang = lang,
             callback = callback,
             pdf_cls = Pdf,
+            layout_recognizer = layout_recognizer,
+            mineru_llm_name=parser_model_name,
             **kwargs
         )
 
@@ -142,13 +147,21 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
 
     elif re.search(r"\.doc$", filename, re.IGNORECASE):
         callback(0.1, "Start to parse.")
+        try:
+            from tika import parser as tika_parser
+        except Exception as e:
+            callback(0.8, f"tika not available: {e}. Unsupported .doc parsing.")
+            logging.warning(f"tika not available: {e}. Unsupported .doc parsing for {filename}.")
+            return []
+
         binary = BytesIO(binary)
-        doc_parsed = parser.from_buffer(binary)
-        sections = doc_parsed['content'].split('\n')
-        sections = [(line, "") for line in sections if line]
-        remove_contents_table(sections, eng=is_english(
-            random_choices([t for t, _ in sections], k=200)))
-        callback(0.8, "Finish parsing.")
+        doc_parsed = tika_parser.from_buffer(binary)
+        if doc_parsed.get('content', None) is not None:
+            sections = doc_parsed['content'].split('\n')
+            sections = [(line, "") for line in sections if line]
+            remove_contents_table(sections, eng=is_english(
+                random_choices([t for t, _ in sections], k=200)))
+            callback(0.8, "Finish parsing.")
 
     else:
         raise NotImplementedError(
@@ -164,9 +177,10 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         sections = [s.split("@") for s, _ in sections]
         sections = [(pr[0], "@" + pr[1]) if len(pr) == 2 else (pr[0], '') for pr in sections ]
         chunks = naive_merge(
-            sections, kwargs.get(
-                "chunk_token_num", 256), kwargs.get(
-                "delimer", "\n。；！？"))
+            sections,
+            parser_config.get("chunk_token_num", 256),
+            parser_config.get("delimiter", "\n。；！？")
+        )
 
     # is it English
     # is_english(random_choices([t for t, _ in sections], k=218))
@@ -174,6 +188,10 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
 
     res = tokenize_table(tbls, doc, eng)
     res.extend(tokenize_chunks(chunks, doc, eng, pdf_parser))
+    table_ctx = max(0, int(parser_config.get("table_context_size", 0) or 0))
+    image_ctx = max(0, int(parser_config.get("image_context_size", 0) or 0))
+    if table_ctx or image_ctx:
+        attach_media_context(res, table_ctx, image_ctx)
 
     return res
 

@@ -20,7 +20,7 @@ from common.constants import StatusEnum
 from api.db.db_models import Conversation, DB
 from api.db.services.api_service import API4ConversationService
 from api.db.services.common_service import CommonService
-from api.db.services.dialog_service import DialogService, chat, chatv1
+from api.db.services.dialog_service import DialogService, async_chat, chatv1
 from common.misc_utils import get_uuid
 from api.utils.memory_utils import generate_and_save_memory_async, get_memory_from_redis
 from api.utils.cache_utils import (
@@ -33,7 +33,7 @@ from rag.prompts.generator import chunks_format
 
 
 use_v1 = True
-chat_func = chatv1 if use_v1 else chat
+async_chat_func = chatv1 if use_v1 else async_chat
 class ConversationService(CommonService):
     model = Conversation
 
@@ -98,8 +98,7 @@ def structure_answer(conv, ans, message_id, session_id, memory=""):
         conv.reference[-1] = reference
     return ans
 
-
-def completion(tenant_id, chat_id, question, name="New session", session_id=None, stream=True, **kwargs):
+async def async_completion(tenant_id, chat_id, question, name="New session", session_id=None, stream=True, **kwargs):
     start_time = time.time()
     print(f"[TIMING] completion() started at {start_time}")
     
@@ -141,7 +140,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
                                             "reference": {},
                                             "audio_binary": None,
                                             "id": None,
-                                            "session_id": session_id
+                                        "session_id": session_id
                                         }},
                                     ensure_ascii=False) + "\n\n"
             yield "data:" + json.dumps({"code": 0, "message": "", "data": True}, ensure_ascii=False) + "\n\n"
@@ -212,7 +211,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
     if stream:
         try:
             chunk_count = 0
-            for ans in chat_func(dia, msg, True, **kwargs):
+            async for ans in async_chat_func(dia, msg, True, **kwargs):
                 chunk_count += 1
                 logging.info(f"[COMPLETION] Received chunk #{chunk_count} from chat_func")
                 ans = structure_answer(conv, ans, message_id, session_id, memory)
@@ -237,7 +236,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
 
     else:
         answer = None
-        for ans in chat_func(dia, msg, False, **kwargs):
+        async for ans in async_chat_func(dia, msg, False, **kwargs):
             answer = structure_answer(conv, ans, message_id, session_id, memory)
             ConversationService.update_by_id(conv.id, conv.to_dict())
             
@@ -253,8 +252,7 @@ def completion(tenant_id, chat_id, question, name="New session", session_id=None
         
         yield answer
 
-
-def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwargs):
+async def async_iframe_completion(dialog_id, question, session_id=None, stream=True, **kwargs):
     e, dia = DialogService.get_by_id(dialog_id)
     assert e, "Dialog not found"
     
@@ -317,7 +315,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
 
     if stream:
         try:
-            for ans in  chat_func(dia, msg, True, **kwargs):
+            async for ans in  async_chat_func(dia, msg, True, **kwargs):
                 ans = structure_answer(conv, ans, message_id, session_id, memory)
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
                                            ensure_ascii=False) + "\n\n"
@@ -330,7 +328,7 @@ def iframe_completion(dialog_id, question, session_id=None, stream=True, **kwarg
 
     else:
         answer = None
-        for ans in chat_func(dia, msg, False, **kwargs):
+        async for ans in async_chat_func(dia, msg, False, **kwargs):
             answer = structure_answer(conv, ans, message_id, session_id, memory)
             API4ConversationService.append_message(conv.id, conv.to_dict())
             break

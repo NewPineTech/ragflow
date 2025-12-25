@@ -33,13 +33,12 @@ from plugin import GlobalPluginManager
 logging.basicConfig(level=logging.INFO)
 logging.info("RAGFlow server starting...")
 
-from api import settings
+from common import settings
 from api.apps import app, smtp_mail_server
 from api.db.runtime_config import RuntimeConfig
 from api.db.services.document_service import DocumentService
 from common.config_utils import show_configs
 from api.versions import get_ragflow_version
-from rag.settings import print_rag_settings
 from rag.utils.mcp_tool_call_conn import shutdown_all_mcp_sessions
 from rag.utils.redis_conn import RedisDistributedLock
 
@@ -92,7 +91,7 @@ from api import utils
 logging.info(f'project base: {get_project_base_directory()}')
 show_configs()
 settings.init_settings()
-print_rag_settings()
+settings.print_rag_settings()
 
 # Check for debugpy
 RAGFLOW_DEBUGPY_LISTEN = int(os.environ.get('RAGFLOW_DEBUGPY_LISTEN', "0"))
