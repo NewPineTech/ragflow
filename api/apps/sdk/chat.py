@@ -76,10 +76,10 @@ async def create(tenant_id):
     req["top_n"] = req.get("top_n", 6)
     req["top_k"] = req.get("top_k", 1024)
     req["rerank_id"] = req.get("rerank_id", "")
-    if req.get("rerank_id"):
-        value_rerank_model = ["BAAI/bge-reranker-v2-m3", "maidalun1020/bce-reranker-base_v1"]
-        if req["rerank_id"] not in value_rerank_model and not TenantLLMService.query(tenant_id=tenant_id, llm_name=req.get("rerank_id"), model_type="rerank"):
-            return get_error_data_result(f"`rerank_model` {req.get('rerank_id')} doesn't exist")
+    #if req.get("rerank_id"):
+    #    value_rerank_model = ["BAAI/bge-reranker-v2-m3", "maidalun1020/bce-reranker-base_v1"]
+    #    if req["rerank_id"] not in value_rerank_model and not TenantLLMService.query(tenant_id=tenant_id, llm_name=req.get("rerank_id"), model_type="rerank"):
+    #        return get_error_data_result(f"`rerank_model` {req.get('rerank_id')} doesn't exist")
     if not req.get("llm_id"):
         req["llm_id"] = tenant.llm_id
     if not req.get("name"):
@@ -196,10 +196,10 @@ async def update(tenant_id, chat_id):
         req["prompt_config"] = req.pop("prompt")
     e, res = DialogService.get_by_id(chat_id)
     res = res.to_json()
-    if req.get("rerank_id"):
-        value_rerank_model = ["BAAI/bge-reranker-v2-m3", "maidalun1020/bce-reranker-base_v1"]
-        if req["rerank_id"] not in value_rerank_model and not TenantLLMService.query(tenant_id=tenant_id, llm_name=req.get("rerank_id"), model_type="rerank"):
-            return get_error_data_result(f"`rerank_model` {req.get('rerank_id')} doesn't exist")
+    #if req.get("rerank_id"):
+    #    value_rerank_model = ["BAAI/bge-reranker-v2-m3", "maidalun1020/bce-reranker-base_v1"]
+    #    if req["rerank_id"] not in value_rerank_model and not TenantLLMService.query(tenant_id=tenant_id, llm_name=req.get("rerank_id"), model_type="rerank"):
+    #        return get_error_data_result(f"`rerank_model` {req.get('rerank_id')} doesn't exist")
     if "name" in req:
         if not req.get("name"):
             return get_error_data_result(message="`name` cannot be empty.")
