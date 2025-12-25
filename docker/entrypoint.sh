@@ -37,7 +37,7 @@ ENABLE_ADMIN_SERVER=0 # Default close admin server
 INIT_SUPERUSER_ARGS="" # Default to not initialize superuser
 CONSUMER_NO_BEG=0
 CONSUMER_NO_END=0
-WORKERS=4
+WORKERS=1
 
 MCP_HOST="127.0.0.1"
 MCP_PORT=9382
@@ -163,9 +163,6 @@ done < "${TEMPLATE_FILE}"
 export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/"
 PY=python3
 
-python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-
 # -----------------------------------------------------------------------------
 # Function(s)
 # -----------------------------------------------------------------------------
@@ -198,7 +195,13 @@ function start_mcp_server() {
 
 function ensure_docling() {
     [[ "${USE_DOCLING}" == "true" ]] || { echo "[docling] disabled by USE_DOCLING"; return 0; }
-    python3 -c 'import pip' >/dev/null 2>&1 || python3 -m ensurepip --upgrade || true
+    
+    # Check if pip is available, skip installation if not
+    if ! python3 -c 'import pip' >/dev/null 2>&1; then
+        echo "[docling] pip not available in venv, skipping docling installation"
+        return 0
+    fi
+    
     DOCLING_PIN="${DOCLING_VERSION:-==2.58.0}"
     python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('docling') else 1)" \
       || python3 -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple --no-cache-dir "docling${DOCLING_PIN}"
@@ -228,7 +231,6 @@ if [[ "${ENABLE_DATASYNC}" -eq 1 ]]; then
         wait;
         sleep 1;
     done &
-    sleep 30
 fi
 
 if [[ "${ENABLE_ADMIN_SERVER}" -eq 1 ]]; then

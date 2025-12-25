@@ -133,6 +133,29 @@ async def update_memory(memory_id):
         return get_json_result(message=str(e), code=RetCode.SERVER_ERROR)
 
 
+@manager.route("/<memory_id>", methods=["GET"]) # noqa: F821
+@login_required
+async def get_memory_detail(memory_id):
+    """Get memory details with message list"""
+    memory = MemoryService.get_with_owner_name_by_id(memory_id)
+    if not memory:
+        return get_json_result(code=RetCode.NOT_FOUND, message=f"Memory '{memory_id}' not found.")
+    
+    # Get pagination parameters from query string
+    args = request.args
+    keywords = args.get("keywords", "")
+    page = int(args.get("page", 1))
+    page_size = int(args.get("page_size", 50))
+    
+    try:
+        # TODO: Implement message listing logic here
+        # For now, return memory config similar to get_memory_config
+        return get_json_result(message=True, data=format_ret_data_from_memory(memory))
+    except Exception as e:
+        logging.error(e)
+        return get_json_result(message=str(e), code=RetCode.SERVER_ERROR)
+
+
 @manager.route("/<memory_id>", methods=["DELETE"]) # noqa: F821
 @login_required
 async def delete_memory(memory_id):

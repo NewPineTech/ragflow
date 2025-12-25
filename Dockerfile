@@ -25,7 +25,6 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps 
 ENV TIKA_SERVER_JAR="file:///ragflow/tika-server-standard-3.0.0.jar"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV UV_INDEX_URL=https://pypi.org/simple
-
 # Setup apt
 # Python package and implicit dependencies:
 # opencv-python: libglib2.0-0 libglx-mesa0 libgl1
@@ -202,7 +201,4 @@ RUN chmod +x ./entrypoint*.sh
 COPY --from=builder /ragflow/web/dist /ragflow/web/dist
 
 COPY --from=builder /ragflow/VERSION /ragflow/VERSION
-
-RUN . ${VIRTUAL_ENV}/bin/activate && pip install gunicorn
-
 ENTRYPOINT ["./entrypoint.sh"]
