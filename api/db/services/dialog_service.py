@@ -354,7 +354,7 @@ def classify_and_respond(dialog, messages, stream=True):
                 yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
     else:
-        answer = chat_mdl.chat(system_content, msg, dialog.llm_setting)
+        answer = chat_mdl.async_chat(system_content, msg, dialog.llm_setting)
         
         # Extract classification
         if "[CLASSIFY:KB]" in answer:
