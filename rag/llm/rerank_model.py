@@ -167,9 +167,38 @@ class NvidiaRerank(Base):
         res = requests.post(self.base_url, headers=self.headers, json=data).json()
         rank = np.zeros(len(texts), dtype=float)
         try:
-            for d in res["rankings"]:
-                rank[d["index"]] = d["logit"]
+            # Prefer NVIDIA response schema: { "rankings": [ { "index": int, "logit": float }, ... ] }
+            rankings = res.get("rankings")
+
+            # Fallbacks for compatible servers that might return different keys
+            if rankings is None:
+                # Common alt keys: "results" (Jina-like), "data", "output"
+                alt = res.get("results") or res.get("data") or res.get("output")
+                # If alt is a dict, try nested common keys
+                if isinstance(alt, dict):
+                    rankings = alt.get("rankings") or alt.get("results") or alt.get("data")
+                else:
+                    rankings = alt
+
+            if isinstance(rankings, (list, tuple)):
+                for d in rankings:
+                    # Index field name variations
+                    idx = d.get("index")
+                    if idx is None:
+                        idx = d.get("document_index")
+
+                    # Score field name variations
+                    score = d.get("logit")
+                    if score is None:
+                        score = d.get("relevance_score") or d.get("score")
+
+                    if idx is not None and 0 <= int(idx) < len(texts) and isinstance(score, (int, float)):
+                        rank[int(idx)] = float(score)
+            else:
+                # No recognizable rankings structure; emit diagnostic and leave zeros
+                raise KeyError("No rankings/results found in rerank response")
         except Exception as _e:
+            # Log full response for troubleshooting but keep function resilient
             log_exception(_e, res)
         return rank, token_count
 
