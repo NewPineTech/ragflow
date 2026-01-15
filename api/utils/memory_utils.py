@@ -98,7 +98,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
     """
    
     
-    def truncate_memory(text, max_words=100):
+    def truncate_memory(text, max_words=200):
         words = text.strip().split()
         if len(words) > max_words:
             text = " ".join(words[:max_words])

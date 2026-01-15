@@ -96,8 +96,9 @@ def get_current_datetime_info():
             # Năm 2025 = Ất Tỵ (2025 - 4 = 2021, 2021 % 10 = 1 -> Ất, 2021 % 12 = 5 -> Tỵ)
             can = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
             chi = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
-            can_index = (now.year - 4) % 10
-            chi_index = (now.year - 4) % 12
+            lunar_year = getattr(lunar, "lunarYear", None) or getattr(lunar, "year", None) or now.year
+            can_index = (lunar_year - 4) % 10
+            chi_index = (lunar_year - 4) % 12
             nam_can_chi = f"{can[can_index]} {chi[chi_index]}"
             
             datetime_info += f" (Âm lịch: ngày {lunar.day}, tháng {lunar.month}, năm {nam_can_chi})"
@@ -292,12 +293,11 @@ def classify_and_respond(dialog, messages, stream=True):
     # Combined system prompt: Classify + Respond with STRONG instruction
    
     system_content = f"""
-                    ## Context:\n{datetime_info}\n
-                    ## Role:\n
+                    ## DATETIME CONTEXT:\n{datetime_info}\n
                     {prompt_config.get("system", "")}
                     \n
                     {classify_and_respond_prompt()}"""
-
+    logging.info(f"[CLASSIFY_AND_RESPOND] System Prompt: {system_content}...")
     tts_mdl = None
     if prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
@@ -316,7 +316,7 @@ def classify_and_respond(dialog, messages, stream=True):
         classify_gen_conf["max_tokens"] = 50  # Only allow short acknowledgment
         
         for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, system_content, msg, classify_gen_conf):
-            logging.info(f"[CLASSIFY_DEBUG] answer={answer[:200]}, classify_type={classify_type}, is_final={is_final}")
+            #logging.info(f"[CLASSIFY_DEBUG] answer={answer[:200]}, classify_type={classify_type}, is_final={is_final}")
             
             # Extract classification from first chunk
             if classify_type is None:
@@ -1110,15 +1110,15 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         system_content = prompt_config["system"]
     
     # 🔧 Build single system prompt with all context (datetime, memory, knowledge)
-    system_parts = [system_content, f"\n## Context:\n{datetime_info}"]
+    system_parts = [system_content, f"\n## DATETIME CONTEXT:\n{datetime_info}"]
     
     if memory_text:
-        system_parts.append(f"\n## Memory:\n{memory_text}")
+        system_parts.append(f"\n## MEMORY:\n{memory_text}")
         logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
-        system_parts.append(f"\n## Knowledge:\n{kwargs['knowledge']}")
+        system_parts.append(f"\n## KNOWLEDGE:\n{kwargs['knowledge']}")
     
     # Add instruction based on whether initial response exists
     if kb_initial_response:
