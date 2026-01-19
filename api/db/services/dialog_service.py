@@ -17,12 +17,17 @@ import binascii
 import logging
 import re
 import time
+import warnings
 from copy import deepcopy
 from datetime import datetime
 from functools import partial
 from timeit import default_timer as timer
 from langfuse import Langfuse
 from peewee import fn
+
+# Suppress LiteLLM async task warnings
+warnings.filterwarnings("ignore", message=".*coroutine.*was never awaited.*")
+warnings.filterwarnings("ignore", message=".*Task was destroyed but it is pending.*")
 
 try:
     from lunarcalendar import Converter, Solar
@@ -256,23 +261,40 @@ def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, mi
     Yields:
         tuple: (accumulated_answer, delta_text, is_final)
     """
+    import asyncio
     last_ans = ""
     answer = ""
     
-    for ans in chat_mdl._sync_from_async_stream(chat_mdl.async_chat_streamly, system_content, messages, gen_conf):
-        answer = ans
-        delta_ans = answer[len(last_ans):]
+    try:
+        stream = chat_mdl._sync_from_async_stream(chat_mdl.async_chat_streamly, system_content, messages, gen_conf)
+        for ans in stream:
+            answer = ans
+            delta_ans = answer[len(last_ans):]
+            
+            if not delta_ans or len(delta_ans) < min_delta_len:
+                continue
+            
+            last_ans = answer
+            yield (answer, delta_ans, False)
         
-        if not delta_ans or len(delta_ans) < min_delta_len:
-            continue
-        
-        last_ans = answer
-        yield (answer, delta_ans, False)
-    
-    # Final chunk: ensure complete answer is yielded
-    if len(answer) > len(last_ans):
-        delta_ans = answer[len(last_ans):]
-        yield (answer, delta_ans, True)
+        # Final chunk: ensure complete answer is yielded
+        if len(answer) > len(last_ans):
+            delta_ans = answer[len(last_ans):]
+            yield (answer, delta_ans, True)
+            
+        # Give async tasks time to complete cleanup
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Schedule cleanup for next iteration
+                asyncio.ensure_future(asyncio.sleep(0))
+        except:
+            pass
+            
+    except GeneratorExit:
+        # Generator was closed early - this is normal for KB classification flow
+        logging.debug("[STREAM] Generator closed early - cleaning up")
+        pass
 
 def classify_and_respond(dialog, messages, stream=True):
     """
@@ -297,7 +319,6 @@ def classify_and_respond(dialog, messages, stream=True):
                     {prompt_config.get("system", "")}
                     \n
                     {classify_and_respond_prompt()}"""
-    logging.info(f"[CLASSIFY_AND_RESPOND] System Prompt: {system_content}...")
     tts_mdl = None
     if prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
@@ -835,49 +856,46 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     # Returns immediately if KB not needed, otherwise proceeds with retrieval
     result_gen = classify_and_respond(dialog, messages, stream)
     
-    # Try to get the first item from the generator
+    # Collect all responses from classify_and_respond
     kb_initial_response = ""
+    classify_type = None
+    collected_responses = []
+    
     try:
-        first_item = next(result_gen)
+        for item in result_gen:
+            if isinstance(item, dict):
+                collected_responses.append(item)
+                if item.get("classify_type"):
+                    classify_type = item.get("classify_type")
+                    kb_initial_response = item.get("answer", "")
         
-        # Check classify_type from response
-        if isinstance(first_item, dict):
-            classify_type = first_item.get("classify_type")
+        # Now process based on classification
+        if classify_type == "KB":
+            logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
+            # Stream collected KB acknowledgment
+            if stream:
+                for resp in collected_responses:
+                    yield {"answer": resp.get("answer", ""), "reference": {}, "audio_binary": None, "memory": None}
             
-            if classify_type == "KB":
-                logging.info(f"[CHATV1] Question requires KB - proceeding with retrieval")
-                # 🚀 Stream initial KB response immediately and save it
-                kb_initial_response = first_item.get("answer", "")
-                if stream and kb_initial_response:
-                    yield {"answer": kb_initial_response, "reference": {}, "audio_binary": None, "memory": None}
-                
-                # Collect any remaining chunks from classify_and_respond
-                for ans in result_gen:
-                    if ans.get("answer"):
-                        # Accumulate to initial response
-                        kb_initial_response = ans.get("answer", "")
-                        if stream:
-                            yield {"answer": kb_initial_response, "reference": {}, "audio_binary": None, "memory": None}
-                
-                logging.info(f"[CHATV1] KB initial response collected: {kb_initial_response[:100]}")
-                # Continue with KB retrieval flow below (kb_initial_response will be prepended)
-            else:
-                # GREET or SENSITIVE - yield first item and continue with rest
-                logging.info(f"[CHATV1] Non-KB question ({classify_type}) - streaming response from classify_and_respond")
-                yield first_item
-                for ans in result_gen:
-                    yield ans
-                return
+            logging.info(f"[CHATV1] KB initial response collected: {kb_initial_response[:100]}")
+            # Continue with KB retrieval flow below
+        elif classify_type in ["GREET", "SENSITIVE"]:
+            # Stream GREET/SENSITIVE responses and return
+            logging.info(f"[CHATV1] Non-KB question ({classify_type}) - streaming response")
+            for resp in collected_responses:
+                yield resp
+            return
         else:
-            # Unexpected format
-            logging.warning(f"[CHATV1] Unexpected first_item format: {type(first_item)}")
-            # Continue with KB flow as fallback
+            # No clear classification - default to KB
+            logging.warning(f"[CHATV1] No clear classification - defaulting to KB retrieval")
+            if collected_responses and stream:
+                for resp in collected_responses:
+                    yield {"answer": resp.get("answer", ""), "reference": {}, "audio_binary": None, "memory": None}
+                kb_initial_response = collected_responses[-1].get("answer", "")
             
-    except StopIteration:
-        # Generator is empty - this should not happen due to fallback in classify_and_respond
-        # Default to KB retrieval as fallback
-        logging.warning(f"[CHATV1] classify_and_respond returned empty generator - defaulting to KB retrieval")
-        # Continue with normal KB flow below
+    except Exception as e:
+        logging.error(f"[CHATV1] Error in classify_and_respond: {e}")
+        # Continue with KB flow as fallback
     
     #classify =  [question_classify_prompt(dialog.tenant_id, dialog.llm_id, current_message)][0]
     #if (classify == "GREET" or classify=="SENSITIVE") or classify=="UNKNOWN" or ( not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key")):
@@ -981,6 +999,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     knowledges = []
     kb_retrieval_task = None
     kb_result_queue = None
+    should_start_kb_thread = False
 
     # 🚀 START KB RETRIEVAL EARLY (in parallel thread) - Don't wait for it yet!
     if attachments is not None and "knowledge" in [p["key"] for p in prompt_config["parameters"]]:
@@ -1017,6 +1036,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             import queue
             
             kb_result_queue = queue.Queue()
+            should_start_kb_thread = True
             
             def do_kb_retrieval():
                 try:
@@ -1038,6 +1058,8 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
                             rerank_mdl=rerank_mdl,
                             rank_feature=label_question(" ".join(questions), kbs),
                         )
+                        logging.info(f"[CHATV1] 🚀 KB retrieving {len(result['chunks'])} chunks")
+
                         if prompt_config.get("toc_enhance"):
                             cks = retriever.retrieval_by_toc(" ".join(questions), result["chunks"], tenant_ids, chat_mdl, dialog.top_n)
                             if cks:
@@ -1078,18 +1100,25 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     retrieval_ts = timer()
     
     # 🚀 NOW WAIT FOR KB RETRIEVAL TO COMPLETE (if it was started in background thread)
-    if kb_retrieval_task is not None:
+    if kb_retrieval_task is not None and should_start_kb_thread:
         logging.info("[CHATV1] ⏳ Waiting for KB retrieval thread to complete...")
-        kb_retrieval_task.join()  # Wait for thread to finish
+        kb_retrieval_task.join(timeout=30)  # Wait with timeout to prevent hanging
         
-        # Get result from queue
-        status, result = kb_result_queue.get()
-        if status == "success":
-            kbinfos = result
-            knowledges = kb_prompt(kbinfos, max_tokens)
-            logging.info(f"[CHATV1] ✅ KB retrieval completed! Retrieved {len(knowledges)} knowledge chunks")
-        else:
-            logging.error(f"[CHATV1] ❌ KB retrieval failed: {result}")
+        if kb_retrieval_task.is_alive():
+            logging.warning("[CHATV1] ⚠️ KB retrieval thread still alive after timeout!")
+        
+        # Get result from queue (non-blocking with timeout)
+        try:
+            status, result = kb_result_queue.get(timeout=1)
+            if status == "success":
+                kbinfos = result
+                knowledges = kb_prompt(kbinfos, max_tokens)
+                logging.info(f"[CHATV1] ✅ KB retrieval completed! Retrieved {len(knowledges)} knowledge chunks")
+            else:
+                logging.error(f"[CHATV1] ❌ KB retrieval failed: {result}")
+                # Continue with empty knowledges
+        except Exception as e:
+            logging.error(f"[CHATV1] Error getting KB result: {e}")
             # Continue with empty knowledges
     
     if not knowledges and prompt_config.get("empty_response"):
@@ -1114,7 +1143,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     
     if memory_text:
         system_parts.append(f"\n## MEMORY:\n{memory_text}")
-        logging.info(f"[CHATV1] Memory added: {memory_text[:100]}...")
+        logging.info(f"[CHATV1] Memory added: {memory_text}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
@@ -1218,9 +1247,22 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
 
         tk_num = num_tokens_from_string(think + answer)
         prompt += "\n\n### Query:\n%s" % " ".join(questions)
-        prompt = (
-            f"{prompt}\n\n"
-            "## Time elapsed:\n"
+        # prompt = (
+        #     f"{prompt}\n\n"
+        #     "## Time elapsed:\n"
+        #     f"  - Total: {total_time_cost:.1f}ms\n"
+        #     f"  - Check LLM: {check_llm_time_cost:.1f}ms\n"
+        #     f"  - Check Langfuse tracer: {check_langfuse_tracer_cost:.1f}ms\n"
+        #     f"  - Bind models: {bind_embedding_time_cost:.1f}ms\n"
+        #     f"  - Query refinement(LLM): {refine_question_time_cost:.1f}ms\n"
+        #     f"  - Retrieval: {retrieval_time_cost:.1f}ms\n"
+        #     f"  - Generate answer: {generate_result_time_cost:.1f}ms\n\n"
+        #     "## Token usage:\n"
+        #     f"  - Generated tokens(approximately): {tk_num}\n"
+        #     f"  - Token speed: {int(tk_num / (generate_result_time_cost / 1000.0))}/s"
+        # )
+        performance_metric = (
+            f"## Time elapsed:\n"
             f"  - Total: {total_time_cost:.1f}ms\n"
             f"  - Check LLM: {check_llm_time_cost:.1f}ms\n"
             f"  - Check Langfuse tracer: {check_langfuse_tracer_cost:.1f}ms\n"
@@ -1232,7 +1274,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             f"  - Generated tokens(approximately): {tk_num}\n"
             f"  - Token speed: {int(tk_num / (generate_result_time_cost / 1000.0))}/s"
         )
-        logging.info(f"[CHATV1] {prompt}")
+        logging.info(performance_metric)
         
         if langfuse_tracer and "langfuse_generation" in locals():
             langfuse_output = "\n" + re.sub(r"^.*?(### Query:.*)", r"\1", prompt, flags=re.DOTALL)

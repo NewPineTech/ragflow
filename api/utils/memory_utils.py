@@ -117,7 +117,7 @@ def generate_and_save_memory_async(conversation_id: str, dialog, messages: list,
             
             if memory_text:
                 result = save_memory_to_redis(conversation_id, memory_text)
-                print(f"\n[MEMORY]:\n  {memory_text}")
+                #print(f"\n[MEMORY]:\n  {memory_text}")
                 #if result:
                 #    logging.info(f"[MEMORY] Memory saved successfully for conversation: {conversation_id}")
                 #else:
