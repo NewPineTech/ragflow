@@ -480,7 +480,7 @@ def question_classify_prompt(tenant_id=None, llm_id=None, content="", language=N
    
     template = PROMPT_JINJA_ENV.from_string(QUESTION_CLASSIFY_TEMPLATE)
     rendered_prompt = template.render(content=content)
-    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(rendered_prompt, [{"role": "user", "content": "Output: "}], {}))
     return ans if ans.find("**ERROR**") < 0 else content
 
 
@@ -515,7 +515,7 @@ def begin_chat(tenant_id=None, llm_id=None,  messages=[], language=None, chat_md
         language=language,
     )
 
-    ans = chat_mdl.chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(rendered_prompt, [{"role": "user", "content": "Output: "}], {}))
     ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
     return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
 

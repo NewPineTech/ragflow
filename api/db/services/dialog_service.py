@@ -427,7 +427,7 @@ def chat_solo(dialog, messages, stream=True, memory_text=None):
             else:
                 yield {"answer": answer, "reference": {}, "audio_binary": None, "memory": None}
     else:
-        answer = chat_mdl.chat(system_prompt+"\n"+system_content , msg[1:], {})
+        answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(system_content, msg[-1:], {}))
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
@@ -1310,7 +1310,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         final_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
         yield decorate_answer(final_answer)
     else:
-        answer = chat_mdl.chat(prompt + prompt4citation, msg[1:], gen_conf)
+        answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf))
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         # Prepend kb_initial_response to non-streaming answer too
