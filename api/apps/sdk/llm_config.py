@@ -211,3 +211,71 @@ def get_languages(tenant_id):
         return construct_json_result(data=languages)
     except Exception as e:
         return get_error_data_result(message=str(e))
+
+@manager.route("/embedding_models", methods=["GET"])  # noqa: F821
+@token_required
+def get_embedding_models(tenant_id):
+    """
+    Get list of available embedding models for dialog configuration.
+    ---
+    tags:
+      - LLM
+    security:
+      - ApiKeyAuth: []
+    parameters:
+      - in: header
+        name: Authorization
+        type: string
+        required: true
+        description: Bearer token for authentication.
+    responses:
+      200:
+        description: List of embedding models.
+        schema:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  llm_id:
+                    type: string
+                    description: LLM identifier (factory@name).
+                  llm_factory:
+                    type: string
+                    description: LLM factory/provider.
+                  llm_name:
+                    type: string
+                    description: LLM model name.
+                  model_type:
+                    type: string
+                    description: Model type.
+                  max_tokens:
+                    type: integer
+                    description: Maximum tokens.
+                  api_base:
+                    type: string
+                    description: API base URL.
+    """
+    try:
+        objs = TenantLLMService.query(
+            tenant_id=tenant_id,
+            model_type=LLMType.EMBEDDING.value
+        )
+
+        result = []
+        for o in objs:
+            if o.status == StatusEnum.VALID.value and o.api_key:
+                result.append({
+                    "llm_id": f"{o.llm_name}@{o.llm_factory}",
+                    "llm_factory": o.llm_factory,
+                    "llm_name": o.llm_name,
+                    "model_type": o.model_type,
+                    "max_tokens": o.max_tokens or 8192,
+                    "api_base": o.api_base or ""
+                })
+
+        return construct_json_result(data=result)
+    except Exception as e:
+        return get_error_data_result(message=str(e))

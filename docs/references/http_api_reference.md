@@ -5477,6 +5477,81 @@ curl --request GET \
 
 ---
 
+---
+
+### Get available embedding models
+
+**GET** `/api/v1/embedding_models`
+
+Retrieves a list of available chat models that can be configured in dialogs. Only returns models that have been configured with valid API keys.
+
+#### Request
+
+- Method: GET
+- URL: `/api/v1/embedding_models`
+- Headers:
+  - `'Authorization: Bearer <YOUR_API_KEY>'`
+
+##### Request example
+
+```bash
+curl --request GET \
+     --url http://{address}/api/v1/embedding_models \
+     --header 'Authorization: Bearer <YOUR_API_KEY>'
+```
+
+#### Response
+
+##### Response example
+
+```json
+{
+  "code": 0,
+  "data": [
+        {
+            "api_base": "",
+            "llm_factory": "OpenAI",
+            "llm_id": "text-embedding-3-large@OpenAI",
+            "llm_name": "text-embedding-3-large",
+            "max_tokens": 8191,
+            "model_type": "embedding"
+        },
+        {
+            "api_base": "",
+            "llm_factory": "OpenAI",
+            "llm_id": "text-embedding-3-small@OpenAI",
+            "llm_name": "text-embedding-3-small",
+            "max_tokens": 8191,
+            "model_type": "embedding"
+        },
+        {
+            "api_base": "",
+            "llm_factory": "OpenAI",
+            "llm_id": "text-embedding-ada-002@OpenAI",
+            "llm_name": "text-embedding-ada-002",
+            "max_tokens": 8191,
+            "model_type": "embedding"
+        }
+  ]
+}
+```
+
+##### Response parameters
+
+- `code`: `integer`  
+  Status code. `0` indicates success.
+
+- `data`: `array`  
+  List of available chat models.
+  - `llm_id`: `string` - Unique identifier in format `{factory}@{model_name}`
+  - `llm_factory`: `string` - LLM provider name (e.g., "OpenAI", "Anthropic")
+  - `llm_name`: `string` - Model name
+  - `model_type`: `string` - Always "embedding" for this endpoint
+  - `max_tokens`: `integer` - Maximum tokens supported by the model
+  - `api_base`: `string` - API base URL (empty string if using default)
+
+---
+
 ## FILE MANAGEMENT
 
 ---
