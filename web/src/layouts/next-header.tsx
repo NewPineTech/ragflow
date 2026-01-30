@@ -110,11 +110,15 @@ export function Header() {
     <section className="py-5 px-10 flex justify-between items-center ">
       <div className="flex items-center gap-4">
         <img
-          src={'/logo.svg'}
-          alt="logo"
+          src={'/logo-cortex.svg'}
+          alt="NPT Cortex"
           className="size-10 mr-[12] cursor-pointer"
           onClick={handleLogoClick}
         />
+        <div className="flex flex-col leading-tight">
+          <span className="text-lg font-semibold text-cortex-text-primary">NPT Cortex</span>
+          <span className="text-xs text-cortex-text-muted">Enterprise AI Core Platform</span>
+        </div>
       </div>
       <Segmented
         rounded="xxxl"
@@ -126,20 +130,6 @@ export function Header() {
         activeClassName="text-bg-base bg-metallic-gradient border-b-[#00BEB4] border-b-2"
       ></Segmented>
       <div className="flex items-center gap-5 text-text-badge">
-        <a
-          target="_blank"
-          href="https://discord.com/invite/NjYzJD3GM3"
-          rel="noreferrer"
-        >
-          <IconFontFill name="a-DiscordIconSVGVectorIcon"></IconFontFill>
-        </a>
-        <a
-          target="_blank"
-          href="https://github.com/infiniflow/ragflow"
-          rel="noreferrer"
-        >
-          <IconFontFill name="GitHub"></IconFontFill>
-        </a>
         <DropdownMenu>
           <DropdownMenuTrigger>
             <div className="flex items-center gap-1">

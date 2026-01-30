@@ -1,14 +1,31 @@
 @import url(./inter.less);
 
+:root {
+  /* NPT Cortex Color Palette */
+  --cortex-navy: #0B1F3B;
+  --cortex-bg-dark: #071427;
+  --cortex-surface: #0E1E36;
+  --cortex-border: #22304F;
+  --cortex-accent: #27D3FF;
+  --cortex-text-primary: #EAF2FF;
+  --cortex-text-muted: #9FB3C8;
+}
+
 html {
   height: 100%;
-  overflow: hidden; // The content of the DatasetSettings page is too high, which will cause scroll bars to appear on the html tags. Setting the maximum height in DatasetSettings does not work either. I don't understand.
+  overflow: hidden;
+  background-color: var(--cortex-bg-dark);
 }
 
 body {
-  font-family: Inter;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
   height: 100%;
+  background-color: var(--cortex-bg-dark);
+  color: var(--cortex-text-primary);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -24,7 +41,7 @@ body {
   height: 100%;
 }
 
-/* Scroll bar stylings */
+/* Scroll bar stylings - Enterprise Dark Theme */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -32,16 +49,16 @@ body {
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: rgb(219, 218, 218);
+  background: var(--cortex-surface);
 }
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #aaaaaa;
-  border-radius: 5px;
+  background: var(--cortex-border);
+  border-radius: 4px;
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--cortex-accent);
 }

@@ -71,7 +71,16 @@ function Root({ children }: React.PropsWithChildren) {
       <ConfigProvider
         theme={{
           token: {
-            fontFamily: 'Inter',
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+            colorPrimary: '#27D3FF',
+            colorInfo: '#27D3FF',
+            colorBgBase: themeragflow === 'dark' ? '#071427' : '#FFFFFF',
+            colorBgContainer: themeragflow === 'dark' ? '#0E1E36' : '#F5F5F5',
+            colorBgLayout: themeragflow === 'dark' ? '#0B1F3B' : '#F0F0F0',
+            colorBorder: themeragflow === 'dark' ? '#22304F' : '#D9D9D9',
+            colorText: themeragflow === 'dark' ? '#EAF2FF' : '#000000',
+            colorTextSecondary: themeragflow === 'dark' ? '#9FB3C8' : '#666666',
+            borderRadius: 4,
           },
           algorithm:
             themeragflow === 'dark'
@@ -105,7 +114,7 @@ const RootProvider = ({ children }: React.PropsWithChildren) => {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
           defaultTheme={ThemeEnum.Dark}
-          storageKey="ragflow-ui-theme"
+          storageKey="npt-cortex-ui-theme"
         >
           <Root>{children}</Root>
         </ThemeProvider>

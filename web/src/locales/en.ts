@@ -80,10 +80,10 @@ export default {
       nicknamePlaceholder: 'Please input nickname',
       register: 'Create an account',
       continue: 'Continue',
-      title: 'A leading RAG engine for LLM context',
+      title: 'Enterprise AI Core Platform',
       start: "Let's get started",
       description:
-        'Sign up for free to explore top RAG technology. Create knowledge bases and AIs to empower your business.',
+        'Sign up for free to explore enterprise-grade AI infrastructure. Build knowledge bases and agents to power your business intelligence.',
       review: 'from 500+ reviews',
     },
     header: {
@@ -335,7 +335,7 @@ Procedural Memory: Learned skills, habits, and automated procedures.`,
       autoKeywordsTip: `Automatically extract N keywords for each chunk to increase their ranking for queries containing those keywords. Be aware that extra tokens will be consumed by the chat model specified in 'System model settings'. You can check or update the added keywords for a chunk from the chunk list. For details, see https://ragflow.io/docs/dev/autokeyword_autoquestion.`,
       autoQuestions: 'Auto-question',
       autoQuestionsTip: `Automatically extract N questions for each chunk to increase their ranking for queries containing those questions. You can check or update the added questions for a chunk from the chunk list. This feature will not disrupt the chunking process if an error occurs, except that it may add an empty result to the original chunk. Be aware that extra tokens will be consumed by the LLM specified in 'System model settings'. For details, see https://ragflow.io/docs/dev/autokeyword_autoquestion.`,
-      redo: 'Do you want to clear the existing {{chunkNum}} chunks?',
+      redo: 'Do you want to clear the existing {{chunkNum}} chunks?', 
       setMetaData: 'Set meta data',
       pleaseInputJson: 'Please enter JSON',
       documentMetaTips: `<p>The meta data is in Json format(it's not searchable). It will be added into prompt for LLM if any chunks of this document are included in the prompt.</p>
@@ -2283,8 +2283,8 @@ Important structured information may include: names, dates, locations, events, k
     },
 
     admin: {
-      loginTitle: 'Admin console',
-      title: 'RAGFlow',
+      loginTitle: 'NPT Cortex Admin',
+      title: 'NPT Cortex',
       confirm: 'Confirm',
       close: 'Close',
       yes: 'Yes',
