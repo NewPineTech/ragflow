@@ -6,7 +6,7 @@ import Header from './components/header';
 
 import styles from './index.less';
 
-const { Content } = Layout;
+const { Content, Sider } = Layout;
 
 const App: React.FC = () => {
   const {
@@ -16,19 +16,23 @@ const App: React.FC = () => {
   return (
     <Layout className={styles.layout}>
       <Layout>
-        <Header></Header>
-        <Divider orientationMargin={0} className={styles.divider} />
-        <Content
-          style={{
-            minHeight: 280,
-            background: colorBgContainer,
-            borderRadius: borderRadiusLG,
-            overflow: 'auto',
-            display: 'flex',
-          }}
-        >
-          <Outlet />
-        </Content>
+        <Sider width={200} style={{ background: colorBgContainer }}>
+          <Header />
+          <Divider type="horizontal" style={{ margin: 0 }} className={styles.divider} />
+        </Sider>
+        <Layout>
+          <Content
+            style={{
+              minHeight: 280,
+              background: colorBgContainer,
+              borderRadius: borderRadiusLG,
+              overflow: 'auto',
+              display: 'flex',
+            }}
+          >
+            <Outlet />
+          </Content>
+        </Layout>
       </Layout>
     </Layout>
   );

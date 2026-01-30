@@ -57,12 +57,12 @@ const RagHeader = () => {
   return (
     <Header
       style={{
-        padding: '0 16px',
+        padding: '16px 0',
         background: colorBgContainer,
         display: 'flex',
-        justifyContent: 'space-between',
+        flexDirection: 'column',
         alignItems: 'center',
-        height: '72px',
+        height: '100%',
       }}
     >
       <a href={window.location.origin}>
