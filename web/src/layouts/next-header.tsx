@@ -65,7 +65,7 @@ export function Header() {
 
   const tagsData = useMemo(
     () => [
-      { path: Routes.Root, name: t('header.Root'), icon: House },
+      { path: Routes.Root, name: t('header.root'), icon: House },
       { path: Routes.Datasets, name: t('header.dataset'), icon: Library },
       { path: Routes.Chats, name: t('header.chat'), icon: MessageSquareText },
       { path: Routes.Searches, name: t('header.search'), icon: Search },
@@ -92,11 +92,29 @@ export function Header() {
     });
   }, [tagsData]);
 
-  // const currentPath = useMemo(() => {
-  //   return (
-  //     tagsData.find((x) => pathname.startsWith(x.path))?.path || Routes.Root
-  //   );
-  // }, [pathname, tagsData]);
+  const currentPath = useMemo(() => {
+    const key = tagsData.find((x) => pathname.startsWith(x.path))?.path;
+
+    if (key) {
+      return key;
+    }
+
+    if (pathname.startsWith(Routes.DatasetBase)) {
+      return Routes.Datasets;
+    } else if (pathname.startsWith(Routes.Chat) || pathname.startsWith(Routes.ChatShare)) {
+      return Routes.Chats;
+    } else if (pathname.startsWith(Routes.Search) || pathname.startsWith(Routes.SearchShare)) {
+      return Routes.Searches;
+    } else if (pathname.startsWith(Routes.Agent) || pathname.startsWith(Routes.AgentTemplates)) {
+      return Routes.Agents;
+    } else if (pathname.startsWith(Routes.Memory)) {
+      return Routes.Memories;
+    } else if (pathname.startsWith('/user-setting')) {
+      return Routes.Root; // Or handle user settings as a specific case if needed, currently usually hidden or modal? Or maybe it doesn't map to a top tab. Assuming unrelated for now or handled by default fallthrough.
+    }
+
+    return Routes.Root;
+  }, [pathname, tagsData]);
 
   const handleChange = (path: SegmentedValue) => {
     navigate(path as Routes);
@@ -107,7 +125,7 @@ export function Header() {
   }, [navigate]);
 
   return (
-    <section className="py-5 px-10 flex justify-between items-center ">
+    <section style={{ borderBottom: 'none' }} className="py-5 px-10 flex justify-between items-center ">
       <div className="flex items-center gap-4">
         <img
           src={'/logo-cortex.svg'}
@@ -125,7 +143,7 @@ export function Header() {
         sizeType="xl"
         buttonSize="xl"
         options={options}
-        value={pathname}
+        value={currentPath}
         onChange={handleChange}
         activeClassName="text-bg-base bg-metallic-gradient border-b-[#00BEB4] border-b-2"
       ></Segmented>
