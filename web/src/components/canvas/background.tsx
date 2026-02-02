@@ -3,8 +3,8 @@ import { Background } from '@xyflow/react';
 export function AgentBackground() {
   return (
     <Background
-      color="var(--text-primary)"
-      bgColor="rgb(var(--bg-canvas))"
+      color="hsl(var(--foreground) / 0.1)"
+      bgColor="hsl(var(--bg-canvas))"
       className="rounded-lg"
     />
   );

@@ -15,9 +15,12 @@ import {
   useFetchTenantInfo,
   useFetchUserInfo,
 } from '@/hooks/use-user-setting-request';
-import { Send, Settings } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Routes } from '@/routes';
+import { ArrowLeft, Send, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'umi';
 import {
   ISearchAppDetailProps,
   useFetchSearchDetail,
@@ -30,6 +33,7 @@ import { SearchSetting } from './search-setting';
 import SearchingPage from './searching';
 
 export default function SearchPage() {
+  const navigate = useNavigate();
   const { navigateToSearchList } = useNavigatePage();
   const [isSearching, setIsSearching] = useState(false);
   const { data: SearchData } = useFetchSearchDetail();
@@ -56,26 +60,51 @@ export default function SearchPage() {
   }, [isSearching]);
 
   return (
-    <section>
-      <PageHeader>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink onClick={navigateToSearchList}>
-                {t('header.search')}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{SearchData?.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+    <section className="h-full flex flex-col bg-background overflow-hidden relative">
+      <PageHeader className="px-10 border-b border-border/40 bg-background/50 backdrop-blur-md">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 rounded-xl bg-background/50 text-sidebar-foreground hover:text-primary transition-all duration-300 shadow-sm border border-border/20 group"
+            onClick={() => navigate(Routes.Searches)}
+          >
+            <ArrowLeft className="size-4 group-hover:scale-110 transition-transform" />
+          </Button>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={navigateToSearchList}>
+                  {t('header.search')}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-semibold text-primary">
+                  {SearchData?.name}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <Button
+          className="gradient-primary shadow-glow border-none h-10 rounded-xl px-5 font-semibold transition-all"
+          onClick={() => {
+            handleOperate().then((res) => {
+              if (res) {
+                setOpenEmbed(!openEmbed);
+              }
+            });
+          }}
+        >
+          <Send className="size-4 mr-2" />
+          {t('search.embedApp')}
+        </Button>
       </PageHeader>
-      <div className="flex gap-3 w-full bg-bg-base">
-        <div className="flex-1">
+      <div className="flex-1 flex gap-3 w-full bg-background overflow-hidden relative">
+        <div className="flex-1 overflow-auto">
           {!isSearching && (
-            <div className="animate-fade-in-down">
+            <div className="animate-fade-in-down h-full flex flex-col items-center justify-center p-6">
               <SearchHome
                 setIsSearching={setIsSearching}
                 isSearching={isSearching}
@@ -98,62 +127,52 @@ export default function SearchPage() {
           )}
         </div>
         {openSetting && (
-          <SearchSetting
-            className="mt-20 mr-2"
-            open={openSetting}
-            setOpen={setOpenSetting}
-            data={SearchData as ISearchAppDetailProps}
-          />
+          <div className="w-[450px] border-l border-border/40 bg-sidebar/50 backdrop-blur-md overflow-auto">
+            <SearchSetting
+              open={openSetting}
+              setOpen={setOpenSetting}
+              data={SearchData as ISearchAppDetailProps}
+            />
+          </div>
         )}
-        {
-          <EmbedAppModal
-            open={openEmbed}
-            setOpen={setOpenEmbed}
-            url="/next-search/share"
-            token={SearchData?.id as string}
-            from={SharedFrom.Search}
-            tenantId={tenantId}
-            beta={beta}
-          />
-        }
-        {
-          // <EmbedDialog
-          //   visible={openEmbed}
-          //   hideModal={setOpenEmbed}
-          //   token={SearchData?.id as string}
-          //   from={SharedFrom.Search}
-          //   beta={beta}
-          //   isAgent={false}
-          // ></EmbedDialog>
-        }
+        <EmbedAppModal
+          open={openEmbed}
+          setOpen={setOpenEmbed}
+          url="/next-search/share"
+          token={SearchData?.id as string}
+          from={SharedFrom.Search}
+          tenantId={tenantId}
+          beta={beta}
+        />
       </div>
-      <div className="absolute right-5 top-4 ">
-        <Button
-          className="bg-text-primary  text-bg-base border-b-accent-primary border-b-2"
-          onClick={() => {
-            handleOperate().then((res) => {
-              console.log(res, 'res');
-              if (res) {
-                setOpenEmbed(!openEmbed);
-              }
-            });
-          }}
-        >
-          <Send />
-          <div>{t('search.embedApp')}</div>
-        </Button>
-      </div>
+
       {!isSearching && (
-        <div className="absolute left-5 bottom-12 ">
+        <div className="absolute left-8 bottom-8">
           <Button
-            variant="transparent"
-            className="bg-bg-card"
+            variant="ghost"
+            className={cn(
+              'gap-2 px-4 py-6 rounded-2xl bg-sidebar/40 border border-sidebar-border/30 backdrop-blur-md shadow-lg hover:bg-sidebar/60 transition-all',
+              openSetting &&
+                'bg-primary/10 text-primary border-primary/20 shadow-glow-sm',
+            )}
             onClick={() => setOpenSetting(!openSetting)}
           >
-            <Settings className="text-text-secondary" />
-            <div className="text-text-secondary">
+            <Settings
+              className={cn(
+                'size-5',
+                openSetting
+                  ? 'text-primary animate-spin-slow'
+                  : 'text-muted-foreground',
+              )}
+            />
+            <span
+              className={cn(
+                'font-semibold',
+                openSetting ? 'text-primary' : 'text-muted-foreground',
+              )}
+            >
               {t('search.searchSettings')}
-            </div>
+            </span>
           </Button>
         </div>
       )}

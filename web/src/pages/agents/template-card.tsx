@@ -19,32 +19,40 @@ export function TemplateCard({ data, showModal }: IProps) {
   }, [data, showModal]);
 
   const language = useMemo(() => {
-    return i18n.language || 'en';
-  }, []) as 'en' | 'zh' | 'de';
+    const lng = i18n.language || 'en';
+    return (lng.startsWith('zh') ? 'zh' : 'en') as 'en' | 'zh';
+  }, []);
 
   return (
-    <Card className="border-colors-outline-neutral-standard group relative min-h-40">
-      <CardContent className="p-4 ">
-        <div className="flex justify-start items-center gap-4 mb-4">
-          <RAGFlowAvatar
-            className="w-7 h-7"
-            avatar={data.avatar ? data.avatar : 'https://github.com/shadcn.png'}
-            name={data?.title[language] || 'CN'}
-          ></RAGFlowAvatar>
+    <Card className="group relative border border-border/20 bg-card rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 min-h-40">
+      <CardContent className="p-6">
+        <div className="flex justify-start items-center gap-4 mb-5">
+          <div className="p-1 rounded-2xl bg-background/50 border border-border/10 shadow-sm transition-transform duration-500 group-hover:scale-110">
+            <RAGFlowAvatar
+              className="size-10 rounded-xl"
+              avatar={
+                data.avatar ? data.avatar : 'https://github.com/shadcn.png'
+              }
+              name={data?.title[language] || 'CN'}
+            />
+          </div>
           <div
-            className="text-[18px] font-bold break-words hyphens-auto overflow-hidden"
+            className="text-lg font-bold tracking-tight text-foreground break-words hyphens-auto overflow-hidden"
             lang={language}
           >
             {data?.title[language]}
           </div>
         </div>
-        <p className="break-words hypens-auto" lang={language}>
+        <p
+          className="text-sm leading-relaxed text-muted-foreground break-words hyphens-auto pb-16"
+          lang={language}
+        >
           {data?.description[language]}
         </p>
-        <div className="group-hover:bg-gradient-to-t from-black/70 from-10% via-black/0 via-50% to-black/0 w-full h-full group-hover:block absolute top-0 left-0 hidden rounded-xl">
+
+        <div className="absolute inset-0 bg-background/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-500 rounded-3xl px-6 pb-4 flex items-end">
           <Button
-            variant="default"
-            className="w-1/3 absolute bottom-4 right-4 left-4 justify-center text-center m-auto"
+            className="w-full gradient-primary shadow-glow rounded-xl font-bold translate-y-2 group-hover:translate-y-0 transition-all duration-500 h-11"
             onClick={handleClick}
           >
             {t('flow.useTemplate')}

@@ -37,8 +37,8 @@ export function HomeCard({
             name={data.name}
           />
         </div>
-        <div className="flex flex-col justify-between gap-1 flex-1 h-full w-[calc(100%-50px)]">
-          <section className="flex justify-between">
+        <div className="flex flex-col justify-between gap-1 flex-1 h-full min-w-0">
+          <section className="flex justify-between items-center gap-2">
             <section className="flex flex-1 min-w-0 gap-1 items-center">
               <div className="text-base font-bold leading-snug truncate">
                 {data.name}
@@ -48,12 +48,12 @@ export function HomeCard({
             {moreDropdown}
           </section>
 
-          <section className="flex flex-col gap-1 mt-1">
-            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+          <section className="flex flex-col gap-1 mt-1 min-w-0">
+            <div className="text-sm text-muted-foreground truncate">
               {data.description}
             </div>
-            <div className="flex justify-between items-center">
-              <p className="text-sm opacity-80 whitespace-nowrap">
+            <div className="flex justify-between items-center gap-2">
+              <p className="text-[12px] text-muted-foreground/70 truncate flex-1">
                 {formatDate(data.update_time)}
               </p>
               {sharedBadge}

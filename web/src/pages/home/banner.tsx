@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { useFetchUserInfo } from '@/hooks/use-user-setting-request';
 import { ArrowRight, X } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 function BannerCard() {
   return (
@@ -40,13 +40,21 @@ export function Banner() {
 }
 
 export function NextBanner() {
-  const { t } = useTranslation();
+  const {
+    data: { nickname },
+  } = useFetchUserInfo();
+
   return (
-    <section className="text-5xl pt-10 pb-14 font-bold px-10">
-      <span className="text-text-primary">{t('header.welcome')}</span>
-      <span className="pl-3 text-transparent bg-clip-text  bg-gradient-to-l from-[#40EBE3] to-[#4A51FF]">
-        NPT Cortex
-      </span>
+    <section className="pt-10 pb-2 px-10">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold text-foreground">
+          Welcome back,{' '}
+          <span className="text-gradient">{nickname || 'User'}</span>
+        </h1>
+        <p className="text-muted-foreground text-lg">
+          Build and deploy AI-powered applications with ease
+        </p>
+      </div>
     </section>
   );
 }

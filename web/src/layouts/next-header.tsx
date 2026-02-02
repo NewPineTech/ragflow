@@ -1,4 +1,3 @@
-import { IconFontFill } from '@/components/icon-font';
 import { RAGFlowAvatar } from '@/components/ragflow-avatar';
 import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button';
@@ -101,11 +100,20 @@ export function Header() {
 
     if (pathname.startsWith(Routes.DatasetBase)) {
       return Routes.Datasets;
-    } else if (pathname.startsWith(Routes.Chat) || pathname.startsWith(Routes.ChatShare)) {
+    } else if (
+      pathname.startsWith(Routes.Chat) ||
+      pathname.startsWith(Routes.ChatShare)
+    ) {
       return Routes.Chats;
-    } else if (pathname.startsWith(Routes.Search) || pathname.startsWith(Routes.SearchShare)) {
+    } else if (
+      pathname.startsWith(Routes.Search) ||
+      pathname.startsWith(Routes.SearchShare)
+    ) {
       return Routes.Searches;
-    } else if (pathname.startsWith(Routes.Agent) || pathname.startsWith(Routes.AgentTemplates)) {
+    } else if (
+      pathname.startsWith(Routes.Agent) ||
+      pathname.startsWith(Routes.AgentTemplates)
+    ) {
       return Routes.Agents;
     } else if (pathname.startsWith(Routes.Memory)) {
       return Routes.Memories;
@@ -125,17 +133,24 @@ export function Header() {
   }, [navigate]);
 
   return (
-    <section style={{ borderBottom: 'none' }} className="py-5 px-10 flex justify-between items-center ">
+    <section
+      style={{ borderBottom: 'none' }}
+      className="py-5 px-10 flex justify-between items-center "
+    >
       <div className="flex items-center gap-4">
-        <img
-          src={'/logo-cortex.svg'}
-          alt="NPT Cortex"
-          className="size-10 mr-[12] cursor-pointer"
+        <div
+          className="relative flex items-center justify-center w-10 h-10 rounded-xl gradient-primary shadow-glow cursor-pointer transition-transform hover:scale-105"
           onClick={handleLogoClick}
-        />
+        >
+          <Cpu className="size-6 text-white" />
+        </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-lg font-semibold text-cortex-text-primary">NPT Cortex</span>
-          <span className="text-xs text-cortex-text-muted">Enterprise AI Core Platform</span>
+          <span className="text-lg font-semibold text-cortex-text-primary">
+            NPT Cortex
+          </span>
+          <span className="text-xs text-cortex-text-muted">
+            Enterprise AI Core Platform
+          </span>
         </div>
       </div>
       <Segmented

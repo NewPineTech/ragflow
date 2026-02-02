@@ -31,11 +31,11 @@ module.exports = {
         0.5: '0.5px',
       },
       colors: {
-        border: 'var(--border-default)',
+        border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        background: 'var(--background)',
-        foreground: 'var(--colors-text-neutral-strong)',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         buttonBlueText: 'var(--button-blue-text)',
 
         'colors-outline-sentiment-primary':
@@ -67,34 +67,34 @@ module.exports = {
         'input-border': 'var(--input-border)',
 
         /* design colors */
-        'bg-title': 'var(--bg-title)',
-        'bg-base': 'var(--bg-base)',
-        'bg-card': 'var(--bg-card)',
-        'bg-component': 'var(--bg-component)',
-        'bg-input': 'var(--bg-input)',
+        'bg-title': 'hsl(var(--bg-title))',
+        'bg-base': 'hsl(var(--bg-base))',
+        'bg-card': 'hsl(var(--bg-card))',
+        'bg-component': 'hsl(var(--bg-component))',
+        'bg-input': 'hsl(var(--bg-input))',
         'bg-canvas': {
-          DEFAULT: 'rgb(var(--bg-canvas) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--bg-canvas))',
         },
         'bg-list': {
-          DEFAULT: 'rgb(var(--bg-list) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--bg-list))',
         },
         'text-primary': {
-          DEFAULT: 'rgb(var(--text-primary) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--text-primary))',
         },
         'text-primary-inverse': {
-          DEFAULT: 'rgb(var(--text-primary-inverse) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--text-primary-inverse))',
         },
         'text-secondary': {
-          DEFAULT: 'rgb(var(--text-secondary) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--text-secondary))',
         },
         'text-secondary-inverse': {
-          DEFAULT: 'rgb(var(--text-secondary-inverse) / <alpha-value>)',
+          DEFAULT: 'hsl(var(--text-secondary-inverse))',
         },
-        'text-disabled': 'var(--text-disabled)',
-        'text-input-tip': 'var(--text-input-tip)',
-        'border-default': 'var(--border-default)',
-        'border-accent': 'var(--border-accent)',
-        'border-button': 'var(--border-button)',
+        'text-disabled': 'hsl(var(--text-disabled))',
+        'text-input-tip': 'hsl(var(--text-input-tip))',
+        'border-default': 'hsl(var(--border))',
+        'border-accent': 'hsl(var(--border-accent))',
+        'border-button': 'hsl(var(--border-button))',
         'accent-primary': {
           DEFAULT: 'rgb(var(--accent-primary) / <alpha-value>)',
           5: 'rgba(var(--accent-primary) / 0.05)', // 5%

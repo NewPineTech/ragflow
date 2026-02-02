@@ -258,7 +258,7 @@ function AgentCanvas({ drawerVisible, hideDrawer }: IProps) {
       currentEventListWithoutMessageById,
     });
   return (
-    <div className={cn(styles.canvasWrapper, 'px-5 pb-5')}>
+    <div className={cn(styles.canvasWrapper, 'px-5 pb-5 bg-canvas')}>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         style={{ position: 'absolute', top: 10, left: 0 }}
@@ -333,7 +333,12 @@ function AgentCanvas({ drawerVisible, hideDrawer }: IProps) {
           onBeforeDelete={handleBeforeDelete}
         >
           <AgentBackground></AgentBackground>
-          <Spotlight className="z-0" opcity={0.7} coverage={70} />
+          <Spotlight
+            className="z-0"
+            opcity={0.4}
+            coverage={60}
+            color="#00BEB4"
+          />
           <Controls
             position={'bottom-center'}
             orientation="horizontal"
@@ -382,7 +387,13 @@ function AgentCanvas({ drawerVisible, hideDrawer }: IProps) {
       ></NotebookPen>
       {formDrawerVisible && (
         <AgentInstanceContext.Provider
-          value={{ addCanvasNode, showFormDrawer }}
+          value={{
+            addCanvasNode,
+            showFormDrawer,
+            lastNode,
+            currentSendLoading,
+            startButNotFinishedNodeIds,
+          }}
         >
           <FormSheet
             node={clickedNode}

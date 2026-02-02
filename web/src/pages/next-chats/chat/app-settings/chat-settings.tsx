@@ -92,25 +92,34 @@ export function ChatSettings({ switchSettingVisible }: ChatSettingsProps) {
   }, [data, form]);
 
   return (
-    <section className="p-5  w-[440px] border-l flex flex-col">
-      <div className="flex justify-between items-center text-base pb-2">
+    <section className="flex flex-col h-full flex-1 min-w-0 bg-transparent overflow-hidden">
+      <div className="flex justify-between items-center text-lg font-bold tracking-tight p-6 pb-4">
         {t('chat.chatSetting')}
-        <X className="size-4 cursor-pointer" onClick={switchSettingVisible} />
+        <X
+          className="size-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+          onClick={switchSettingVisible}
+        />
       </div>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-          className="flex-1 flex flex-col min-h-0"
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
         >
-          <section className="space-y-6 overflow-auto flex-1 pr-4 min-h-0">
-            <ChatBasicSetting></ChatBasicSetting>
-            <Separator />
-            <ChatPromptEngine></ChatPromptEngine>
-            <Separator />
-            <ChatModelSettings></ChatModelSettings>
-          </section>
-          <div className="space-x-5 text-right pt-4">
-            <Button variant={'outline'} onClick={switchSettingVisible}>
+          <div className="flex-1 overflow-auto min-h-0 px-6 space-y-8 pb-8 custom-scrollbar">
+            <div className="space-y-6">
+              <ChatBasicSetting />
+              <Separator className="opacity-40" />
+              <ChatPromptEngine />
+              <Separator className="opacity-40" />
+              <ChatModelSettings />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 p-6 pt-4 border-t border-border/40 bg-background/20 backdrop-blur-sm">
+            <Button
+              variant="outline"
+              onClick={switchSettingVisible}
+              className="rounded-xl px-6 h-10 font-semibold border-border/50 hover:bg-sidebar-accent transition-all duration-300"
+            >
               {t('chat.cancel')}
             </Button>
             <SavingButton loading={loading}></SavingButton>

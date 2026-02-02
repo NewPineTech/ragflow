@@ -1,4 +1,4 @@
-import { CardContainer } from '@/components/card-container';
+import { CardSineLineContainer } from '@/components/card-singleline-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -14,9 +14,7 @@ import { useFetchSearchList, useRenameSearch } from './hooks';
 import { SearchCard } from './search-card';
 
 export default function SearchList() {
-  // const { data } = useFetchFlowList();
   const { t } = useTranslate('search');
-  // const [isEdit, setIsEdit] = useState(false);
   const {
     data: list,
     pagination,
@@ -35,16 +33,12 @@ export default function SearchList() {
     initialSearchName,
   } = useRenameSearch();
 
-  // const handleSearchChange = (value: string) => {
-  //   console.log(value);
-  // };
   const onSearchRenameConfirm = (name: string) => {
     onSearchRenameOk(name, () => {
       refetchList();
     });
   };
   const openCreateModalFun = useCallback(() => {
-    // setIsEdit(false);
     showSearchRenameModal();
   }, [showSearchRenameModal]);
   const handlePageChange = useCallback(
@@ -65,50 +59,47 @@ export default function SearchList() {
   }, [isCreate, openCreateModalFun, searchUrl, setSearchUrl]);
 
   return (
-    <section className="w-full h-full flex flex-col">
+    <div className="max-w-6xl mx-auto space-y-8 pb-10 w-full px-10 pt-8">
       {(!list?.data?.search_apps?.length ||
         list?.data?.search_apps?.length <= 0) &&
-        !searchString && (
-          <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
-            <EmptyAppCard
-              showIcon
-              size="large"
-              className="w-[480px] p-14"
-              type={EmptyCardType.Search}
-              isSearch={!!searchString}
-              onClick={() => openCreateModalFun()}
-            />
-          </div>
-        )}
-      {(!!list?.data?.search_apps?.length || searchString) && (
+      !searchString ? (
+        <div className="flex w-full items-center justify-center py-20">
+          <EmptyAppCard
+            showIcon
+            size="large"
+            className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
+            type={EmptyCardType.Search}
+            isSearch={!!searchString}
+            onClick={() => openCreateModalFun()}
+          />
+        </div>
+      ) : (
         <>
-          <div className="px-8 pt-8">
-            <ListFilterBar
-              icon="searches"
-              title={t('searchApps')}
-              showFilter={false}
-              searchString={searchString}
-              onSearchChange={handleInputChange}
+          <ListFilterBar
+            icon="searches"
+            title={t('searchApps')}
+            showFilter={false}
+            searchString={searchString}
+            onSearchChange={handleInputChange}
+          >
+            <Button
+              onClick={() => {
+                openCreateModalFun();
+              }}
+              className="gradient-primary shadow-glow border-none"
             >
-              <Button
-                variant={'default'}
-                onClick={() => {
-                  openCreateModalFun();
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {t('createSearch')}
-              </Button>
-            </ListFilterBar>
-          </div>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('createSearch')}
+            </Button>
+          </ListFilterBar>
           {(!list?.data?.search_apps?.length ||
             list?.data?.search_apps?.length <= 0) &&
             searchString && (
-              <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
+              <div className="flex w-full items-center justify-center py-20">
                 <EmptyAppCard
                   showIcon
                   size="large"
-                  className="w-[480px] p-14"
+                  className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
                   type={EmptyCardType.Search}
                   isSearch={!!searchString}
                   onClick={() => openCreateModalFun()}
@@ -116,7 +107,7 @@ export default function SearchList() {
               </div>
             )}
           <div className="flex-1">
-            <CardContainer className="max-h-[calc(100dvh-280px)] overflow-auto px-8">
+            <CardSineLineContainer>
               {list?.data.search_apps.map((x) => {
                 return (
                   <SearchCard
@@ -128,13 +119,12 @@ export default function SearchList() {
                   ></SearchCard>
                 );
               })}
-            </CardContainer>
+            </CardSineLineContainer>
           </div>
           {list?.data.total && list?.data.total > 0 && (
-            <div className="px-8 mb-4">
+            <div className="flex justify-end mt-8">
               <RAGFlowPagination
                 {...pick(pagination, 'current', 'pageSize')}
-                // total={pagination.total}
                 total={list?.data.total}
                 onChange={handlePageChange}
               />
@@ -151,6 +141,6 @@ export default function SearchList() {
           title={initialSearchName || t('createSearch')}
         ></RenameDialog>
       )}
-    </section>
+    </div>
   );
 }

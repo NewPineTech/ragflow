@@ -23,6 +23,7 @@ import { useSetModalState } from '@/hooks/common-hooks';
 import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
 import { ReactFlowProvider } from '@xyflow/react';
 import {
+  ArrowLeft,
   ChevronDown,
   CirclePlay,
   History,
@@ -207,24 +208,36 @@ export default function Agent() {
   return (
     <section className="h-full">
       <PageHeader>
-        <section>
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink onClick={navigateToAgents}>
-                  {t('header.flow')}
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{agentDetail.title}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <div className="text-xs text-text-secondary translate-y-3">
-            {t('flow.autosaved')} {time}
-          </div>
-        </section>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 rounded-xl bg-background/50 text-sidebar-foreground hover:text-primary transition-all duration-300 shadow-sm border border-border/20 group"
+            onClick={navigateToAgents}
+          >
+            <ArrowLeft className="size-4 group-hover:scale-110 transition-transform" />
+          </Button>
+          <section>
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink onClick={navigateToAgents}>
+                    {t('header.flow')}
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="font-semibold text-primary">
+                    {agentDetail.title}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50 translate-y-2 translate-x-1">
+              {t('flow.autosaved')} {time}
+            </div>
+          </section>
+        </div>
         <div className="flex items-center gap-5">
           <ButtonLoading
             variant={'secondary'}

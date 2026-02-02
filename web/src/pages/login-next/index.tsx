@@ -26,6 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Cpu } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { BgSvg } from './bg';
@@ -106,7 +107,7 @@ const Login = () => {
     resolver: zodResolver(FormSchema),
   });
 
-  const onCheck = async (params) => {
+  const onCheck = async (params: z.infer<typeof FormSchema>) => {
     console.log('params', params);
     try {
       // const params = await form.validateFields();
@@ -138,36 +139,39 @@ const Login = () => {
 
   return (
     <>
-      <Spotlight opcity={0.4} coverage={60} color={'rgb(128, 255, 248)'} />
+      <Spotlight opcity={0.4} coverage={60} color={'#00BEB4'} />
       <Spotlight
         opcity={0.3}
         coverage={12}
         X={'10%'}
         Y={'-10%'}
-        color={'rgb(128, 255, 248)'}
+        color={'#00BEB4'}
       />
       <Spotlight
         opcity={0.3}
         coverage={12}
         X={'90%'}
         Y={'-10%'}
-        color={'rgb(128, 255, 248)'}
+        color={'#00BEB4'}
       />
       <div className=" h-[inherit] relative overflow-auto">
         <BgSvg isPaused={isUserInteracting} />
 
-        <div className="absolute top-3 flex flex-col items-center mb-12 w-full text-text-primary">
-          <div className="flex items-center mb-4 w-full pl-10 pt-10 ">
-            <div className="w-12 h-12 p-2 rounded-lg flex items-center justify-center mr-3">
-              <img
-                src={'/logo.svg'}
-                alt="logo"
-                className="size-8 mr-[12] cursor-pointer"
-              />
+        <div className="absolute top-0 flex flex-col items-center mb-12 w-full text-text-primary">
+          <div className="flex items-center gap-4 px-10 pt-10 w-full mb-8">
+            <div className="relative flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow">
+              <Cpu className="size-7 text-white" />
             </div>
-            <div className="text-xl font-bold self-center">NPT Cortex</div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-2xl font-bold tracking-tight text-foreground">
+                NPT Cortex
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold opacity-70">
+                Enterprise AI Core
+              </span>
+            </div>
           </div>
-          <h1 className="text-[36px] font-medium  text-center mb-2">
+          <h1 className="text-[42px] font-bold tracking-tight text-center mb-2 mt-4">
             {t('title')}
           </h1>
           {/* border border-accent-primary rounded-full */}
@@ -297,28 +301,27 @@ const Login = () => {
                     <ButtonLoading
                       type="submit"
                       loading={loading}
-                      className="bg-metallic-gradient border-b-[#00BEB4] border-b-2 hover:bg-metallic-gradient hover:border-b-[#02bcdd] w-full my-8"
+                      className="gradient-primary shadow-glow text-white font-bold h-12 rounded-xl border-none hover:opacity-90 w-full my-8 transition-all hover:scale-[1.02]"
                     >
                       {title === 'login' ? t('login') : t('continue')}
                     </ButtonLoading>
                     {title === 'login' && channels && channels.length > 0 && (
-                      <div className="mt-3 border">
+                      <div className="flex flex-col gap-3 mt-4">
                         {channels.map((item) => (
                           <Button
-                            variant={'transparent'}
+                            variant={'outline'}
                             key={item.channel}
                             onClick={() => handleLoginWithChannel(item.channel)}
-                            style={{ marginTop: 10 }}
+                            className="w-full h-11 bg-card border-border hover:bg-sidebar-accent hover:border-primary/50 text-foreground transition-all rounded-xl gap-3"
                           >
-                            <div className="flex items-center">
-                              <SvgIcon
-                                name={item.icon || 'sso'}
-                                width={20}
-                                height={20}
-                                style={{ marginRight: 5 }}
-                              />
+                            <SvgIcon
+                              name={item.icon || 'sso'}
+                              width={20}
+                              height={20}
+                            />
+                            <span className="text-sm font-medium">
                               Sign in with {item.display_name}
-                            </div>
+                            </span>
                           </Button>
                         ))}
                       </div>

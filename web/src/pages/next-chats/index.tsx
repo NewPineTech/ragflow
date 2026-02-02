@@ -1,4 +1,4 @@
-import { CardContainer } from '@/components/card-container';
+import { CardSineLineContainer } from '@/components/card-singleline-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -49,40 +49,40 @@ export default function ChatList() {
   }, [isCreate, handleShowCreateModal, searchParams, setSearchParams]);
 
   return (
-    <section className="flex flex-col w-full flex-1">
-      {data.dialogs?.length <= 0 && !searchString && (
-        <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
+    <div className="max-w-6xl mx-auto space-y-8 pb-10 w-full px-10 pt-8">
+      {data.dialogs?.length <= 0 && !searchString ? (
+        <div className="flex w-full items-center justify-center py-20">
           <EmptyAppCard
             showIcon
             size="large"
-            className="w-[480px] p-14"
+            className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
             isSearch={!!searchString}
             type={EmptyCardType.Chat}
             onClick={() => handleShowCreateModal()}
           />
         </div>
-      )}
-      {(data.dialogs?.length > 0 || searchString) && (
+      ) : (
         <>
-          <div className="px-8 pt-8">
-            <ListFilterBar
-              title={t('chat.chatApps')}
-              icon="chats"
-              onSearchChange={handleInputChange}
-              searchString={searchString}
+          <ListFilterBar
+            title={t('chat.chatApps')}
+            icon="chats"
+            onSearchChange={handleInputChange}
+            searchString={searchString}
+          >
+            <Button
+              onClick={handleShowCreateModal}
+              className="gradient-primary shadow-glow border-none"
             >
-              <Button onClick={handleShowCreateModal}>
-                <Plus className="size-2.5" />
-                {t('chat.createChat')}
-              </Button>
-            </ListFilterBar>
-          </div>
+              <Plus className="size-4 mr-2" />
+              {t('chat.createChat')}
+            </Button>
+          </ListFilterBar>
           {data.dialogs?.length <= 0 && searchString && (
-            <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
+            <div className="flex w-full items-center justify-center py-20">
               <EmptyAppCard
                 showIcon
                 size="large"
-                className="w-[480px] p-14"
+                className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
                 isSearch={!!searchString}
                 type={EmptyCardType.Chat}
                 onClick={() => handleShowCreateModal()}
@@ -90,7 +90,7 @@ export default function ChatList() {
             </div>
           )}
           <div className="flex-1 overflow-auto">
-            <CardContainer className="max-h-[calc(100dvh-280px)] overflow-auto px-8">
+            <CardSineLineContainer>
               {data.dialogs.map((x) => {
                 return (
                   <ChatCard
@@ -100,9 +100,9 @@ export default function ChatList() {
                   ></ChatCard>
                 );
               })}
-            </CardContainer>
+            </CardSineLineContainer>
           </div>
-          <div className="mt-8 px-8 pb-8">
+          <div className="mt-8 flex justify-end">
             <RAGFlowPagination
               {...pick(pagination, 'current', 'pageSize')}
               total={pagination.total}
@@ -120,6 +120,6 @@ export default function ChatList() {
           title={initialChatName || t('chat.createChat')}
         ></RenameDialog>
       )}
-    </section>
+    </div>
   );
 }

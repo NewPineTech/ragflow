@@ -114,61 +114,76 @@ export default function Chat() {
   }
 
   return (
-    <section className="h-full flex flex-col pr-5">
-      <PageHeader>
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink onClick={navigateToChatList}>
-                {t('chat.chat')}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{data.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <Button onClick={showEmbedModal}>
-          <Send />
-          {t('common.embedIntoSite')}
-        </Button>
-      </PageHeader>
-      <div className="flex flex-1 min-h-0 pb-9">
-        <Sessions
-          hasSingleChatBox={hasSingleChatBox}
-          handleConversationCardClick={handleSessionClick}
-          switchSettingVisible={switchSettingVisible}
-        ></Sessions>
+    <section className="h-full flex w-full bg-background overflow-hidden relative">
+      <Sessions
+        hasSingleChatBox={hasSingleChatBox}
+        handleConversationCardClick={handleSessionClick}
+        switchSettingVisible={switchSettingVisible}
+      ></Sessions>
 
-        <Card className="flex-1 min-w-0 bg-transparent border h-full">
-          <CardContent className="flex p-0 h-full">
-            <Card className="flex flex-col flex-1 bg-transparent min-w-0">
-              <CardHeader
-                className={cn('p-5', { 'border-b': hasSingleChatBox })}
-              >
-                <CardTitle className="flex justify-between items-center text-base">
-                  <div className="truncate">{currentConversationName}</div>
-                  <Button variant={'ghost'} onClick={switchDebugMode}>
-                    <ArrowUpRight /> {t('chat.multipleModels')}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 p-0 min-h-0">
-                <SingleChatBox
-                  controller={controller}
-                  stopOutputMessage={stopOutputMessage}
-                  conversation={currentConversation}
-                ></SingleChatBox>
-              </CardContent>
-            </Card>
-            {settingVisible && (
+      <div className="flex-1 flex flex-col min-w-0 bg-background/30 transition-all duration-300">
+        <PageHeader className="px-10 border-b border-border/40 bg-background/50 backdrop-blur-md">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={navigateToChatList}>
+                  {t('chat.chat')}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-semibold text-primary">
+                  {data.name}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <Button
+            onClick={showEmbedModal}
+            className="gradient-primary shadow-glow border-none h-10 rounded-xl px-5 font-semibold transition-all"
+          >
+            <Send className="size-4 mr-2" />
+            {t('common.embedIntoSite')}
+          </Button>
+        </PageHeader>
+
+        <div className="flex-1 flex min-w-0 p-8 pr-10 pb-10 overflow-hidden gap-6">
+          <Card className="flex-1 min-w-0 bg-card/40 backdrop-blur-sm border-border/50 shadow-xl rounded-2xl overflow-hidden flex flex-col">
+            <CardHeader
+              className={cn(
+                'px-6 py-4 border-b border-border/40 bg-background/20',
+                { 'border-b': hasSingleChatBox },
+              )}
+            >
+              <CardTitle className="flex justify-between items-center text-base">
+                <div className="truncate font-semibold tracking-tight">
+                  {currentConversationName || t('chat.newConversation')}
+                </div>
+                <Button
+                  variant={'ghost'}
+                  onClick={switchDebugMode}
+                  className="rounded-lg gap-2 text-primary hover:bg-primary/10 transition-all"
+                >
+                  <ArrowUpRight className="size-4" /> {t('chat.multipleModels')}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 p-0 min-h-0">
+              <SingleChatBox
+                controller={controller}
+                stopOutputMessage={stopOutputMessage}
+                conversation={currentConversation}
+              ></SingleChatBox>
+            </CardContent>
+          </Card>
+          {settingVisible && (
+            <div className="w-[440px] flex shrink-0 overflow-hidden bg-card/30 backdrop-blur-md rounded-2xl border border-border/50 shadow-xl">
               <ChatSettings
                 switchSettingVisible={switchSettingVisible}
               ></ChatSettings>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
       </div>
       {embedVisible && (
         <EmbedDialog

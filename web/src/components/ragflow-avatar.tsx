@@ -4,14 +4,16 @@ import { forwardRef, memo, useEffect, useRef, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 const PREDEFINED_COLORS = [
-  { from: '#4F6DEE', to: '#67BDF9' },
-  { from: '#38A04D', to: '#93DCA2' },
-  { from: '#C35F2B', to: '#EDB395' },
-  { from: '#633897', to: '#CBA1FF' },
+  { from: '#6366f1', to: '#06b6d4' }, // Indigo to Cyan
+  { from: '#10b981', to: '#14b8a6' }, // Emerald to Teal
+  { from: '#f59e0b', to: '#f43f5e' }, // Orange to Rose
+  { from: '#8b5cf6', to: '#ec4899' }, // Purple to Pink
+  { from: '#3b82f6', to: '#2dd4bf' }, // Vivid Blue to Teal
 ];
 
 const getStringHash = (str: string): number => {
-  if (typeof str !== 'string') return 0;
+  if (typeof str !== 'string' || !str)
+    return Math.floor(Math.random() * 1000000);
 
   const normalized = str.trim().toLowerCase();
   let hash = 104729;
@@ -27,6 +29,7 @@ const getStringHash = (str: string): number => {
 };
 
 const getColorForName = (name: string): { from: string; to: string } => {
+  if (!name) return PREDEFINED_COLORS[0];
   const hash = getStringHash(name);
   const index = hash % PREDEFINED_COLORS.length;
   return PREDEFINED_COLORS[index];
@@ -100,14 +103,11 @@ export const RAGFlowAvatar = memo(
             calculateFontSize();
           }}
           className={cn(
-            'bg-gradient-to-b',
-            `from-[${from}] to-[${to}]`,
-            'flex items-center justify-center',
-            'text-white ',
+            'flex items-center justify-center font-bold text-white drop-shadow-sm transition-all duration-500',
             { 'rounded-md': !isPerson },
           )}
           style={{
-            backgroundImage: `linear-gradient(to bottom, ${from}, ${to})`,
+            backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
             fontSize: fontSize,
           }}
         >

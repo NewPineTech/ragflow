@@ -1,28 +1,143 @@
 @import url(./inter.less);
 
 :root {
-  /* NPT Cortex Color Palette */
-  --cortex-navy: #0B1F3B;
-  --cortex-bg-dark: #071427;
-  --cortex-surface: #0E1E36;
-  --cortex-border: #22304F;
-  --cortex-accent: #27D3FF;
-  --cortex-text-primary: #EAF2FF;
-  --cortex-text-muted: #9FB3C8;
+  /* AI Core Design System - Modern theme with PineTech blue accents */
+  /* Light mode - default */
+  --background: 210 40% 98%;
+  --foreground: 210 40% 10%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 210 40% 10%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 40% 10%;
+
+  --primary: 190 90% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 20% 94%;
+  --secondary-foreground: 210 40% 20%;
+
+  --muted: 210 20% 94%;
+  --muted-foreground: 210 15% 45%;
+
+  --accent: 195 85% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 210 20% 88%;
+  --input: 210 20% 88%;
+  --ring: 190 90% 50%;
+
+  --radius: 0.75rem;
+
+  /* Sidebar specific - Light */
+  --sidebar-background: 210 25% 97%;
+  --sidebar-foreground: 210 20% 40%;
+  --sidebar-primary: 190 90% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 20% 92%;
+  --sidebar-accent-foreground: 210 40% 15%;
+  --sidebar-border: 210 20% 90%;
+  --sidebar-ring: 190 90% 50%;
+
+  /* Custom gradients - Light */
+  --gradient-primary: linear-gradient(
+    135deg,
+    hsl(190 90% 50%),
+    hsl(200 85% 55%)
+  );
+}
+
+/* Dark mode overrides */
+[data-theme='dark'],
+.dark {
+  --background: 210 30% 8%;
+  --foreground: 0 0% 98%;
+
+  --card: 210 25% 12%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 210 25% 12%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 190 90% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 20% 15%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 210 20% 18%;
+  --muted-foreground: 210 15% 55%;
+
+  --accent: 195 85% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 62% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 210 20% 18%;
+  --input: 210 20% 18%;
+  --ring: 190 90% 50%;
+
+  /* Sidebar specific - Dark */
+  --sidebar-background: 210 25% 9%;
+  --sidebar-foreground: 210 15% 65%;
+  --sidebar-primary: 190 90% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 20% 15%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-border: 210 20% 15%;
+  --sidebar-ring: 190 90% 50%;
+}
+
+/* Utility classes for gradients and shadows */
+.gradient-primary {
+  background: var(--gradient-primary);
+}
+
+.gradient-glow {
+  background: var(--gradient-glow);
+}
+
+.gradient-border {
+  background: var(--gradient-border);
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+.text-gradient {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 html {
   height: 100%;
   overflow: hidden;
-  background-color: var(--cortex-bg-dark);
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   margin: 0;
   height: 100%;
-  background-color: var(--cortex-bg-dark);
-  color: var(--cortex-text-primary);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

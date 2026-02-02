@@ -4,252 +4,284 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    /* AI Core Design System - Modern theme with PineTech blue accents */
+    --background: 210 40% 98%;
+    --foreground: 210 40% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 210 40% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 10%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: 190 90% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 210 40% 20%;
 
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 210 15% 45%;
 
-    --ring: 215 20.2% 65.1%;
+    --accent: 195 85% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --background-inverse-standard: rgba(230, 227, 246, 0.15);
-    --background-inverse-standard-foreground: rgb(92, 81, 81);
-    --colors-background-inverse-standard: rgba(29, 26, 44, 0.1);
-    --colors-background-inverse-strong: rgba(11, 10, 18, 0.8);
-    --colors-background-inverse-weak: rgba(17, 16, 23, 0.1);
-    --colors-background-neutral-standard: white;
-    --colors-background-neutral-strong: rgba(226, 223, 246, 1);
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 190 90% 50%;
 
-    --button-blue-text: rgb(22, 119, 255);
+    --radius: 0.75rem;
 
-    --colors-outline-sentiment-primary: rgba(127, 105, 255, 1);
-    --colors-outline-neutral-strong: rgba(112, 107, 107, 0.15);
-    --colors-outline-neutral-standard: rgba(53, 51, 65, 0.1);
+    /* Base mappings */
+    --bg-base: var(--background);
+    --bg-card: 0 0% 95%;
+    --bg-title: 210 20% 96%;
+    --bg-component: 0 0% 100%;
+    --bg-input: 0 0% 0% / 0;
+    --bg-canvas: 210 20% 96%;
+    --bg-list: 210 20% 96%;
 
-    --colors-text-core-standard: rgba(127, 105, 255, 1);
-    --colors-text-neutral-strong: rgba(17, 16, 23, 1);
-    --colors-text-neutral-standard: rgba(152, 148, 176, 1);
-    --colors-text-neutral-weak: rgba(170, 160, 197, 1);
-    --colors-text-functional-danger: rgba(255, 81, 81, 1);
-    --colors-text-inverse-strong: rgba(255, 255, 255, 1);
-    --colors-text-persist-light: rgba(255, 255, 255, 1);
-    --colors-text-inverse-weak: rgba(184, 181, 203, 1);
+    --text-primary: var(--foreground);
+    --text-secondary: 210 15% 45%;
+    --text-disabled: 210 10% 70%;
+    --text-input-tip: 210 10% 70%;
+    --text-primary-inverse: 210 40% 98%;
+    --text-secondary-inverse: 210 15% 70%;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border-default: 210 20% 88%;
+    /* Maps to --border */
+    --border-accent: 0 0% 0%;
+    --border-button: 0 0% 0% / 0.1;
 
-    --background-inverse-strong: rgba(255, 255, 255, 0.15);
+    /* Sidebar specific - Light */
+    --sidebar-background: 210 25% 97%;
+    --sidebar-foreground: 210 20% 40%;
+    --sidebar-primary: 190 90% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 92%;
+    --sidebar-accent-foreground: 210 40% 15%;
+    --sidebar-border: 210 20% 90%;
+    --sidebar-ring: 190 90% 50%;
 
-    --background-badge: rgba(22, 22, 24, 0.5);
-    --text-badge: rgba(151, 154, 171, 1);
+    /* Custom gradients - Light */
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(190 90% 50%),
+      hsl(200 85% 55%)
+    );
+    --gradient-glow: linear-gradient(
+      180deg,
+      hsl(190 90% 50% / 0.2),
+      transparent
+    );
+    --gradient-border: linear-gradient(
+      180deg,
+      hsl(190 90% 50%),
+      hsl(200 85% 55%)
+    );
 
-    --text-title: rgba(22, 22, 24, 1);
-    --text-sub-title: rgba(151, 154, 171, 1);
-    --text-sub-title-invert: rgba(91, 93, 106, 1);
+    /* Shadows - Light */
+    --shadow-glow: 0 0 40px hsl(190 90% 50% / 0.15);
+    --shadow-card: 0 4px 24px hsl(210 40% 10% / 0.08);
 
-    --background-header-bar: rgba(0, 0, 0, 0.05);
-    --text-title-invert: rgba(255, 255, 255, 1);
-    --background-card: rgba(22, 22, 24, 0.05);
+    /* Legacy Variables Preserved/Overridden as needed */
+    --background-inverse-standard: 230 227 246 / 0.15;
+    --background-inverse-standard-foreground: 92 81 81;
+    --colors-background-inverse-standard: 29 26 44 / 0.1;
+    --colors-background-inverse-strong: 11 10 18 / 0.8;
+    --colors-background-inverse-weak: 17 16 23 / 0.1;
+    --colors-background-neutral-standard: 0 0% 100%;
+    /* white */
+    --colors-background-neutral-strong: 226 223 246;
 
-    --background-note: rgba(22, 22, 24, 0.1);
+    --button-blue-text: 22 119 255;
 
-    --background-highlight: rgba(76, 164, 231, 0.1);
+    --colors-outline-sentiment-primary: 127 105 255;
+    --colors-outline-neutral-strong: 112 107 107 / 0.15;
+    --colors-outline-neutral-standard: 53 51 65 / 0.1;
 
-    --input-border: rgba(22, 22, 24, 0.2);
+    --colors-text-core-standard: 127 105 255;
+    --colors-text-neutral-strong: 17 16 23;
+    --colors-text-neutral-standard: 152 148 176;
+    --colors-text-neutral-weak: 170 160 197;
+    --colors-text-functional-danger: 255 81 81;
+    --colors-text-inverse-strong: 255 255 255;
+    --colors-text-persist-light: 255 255 255;
+    --colors-text-inverse-weak: 184 181 203;
 
+    --background-inverse-strong: 255 255 255 / 0.15;
+    --background-badge: 22 22 24 / 0.5;
+    --text-badge: 151 154 171;
+    --text-title: 22 22 24;
+    --text-sub-title: 151 154 171;
+    --text-sub-title-invert: 91 93 106;
+    --background-header-bar: 0 0 0 / 0.05;
+    --text-title-invert: 255 255 255;
+    --background-card: 22 22 24 / 0.05;
+    --background-note: 22 22 24 / 0.1;
+    --background-highlight: 76 164 231 / 0.1;
+    --input-border: 22 22 24 / 0.2;
     --metallic: #46464a;
-
-    --bg-title: #f6f6f7;
-    /* design colors */
-
-    --bg-base: #ffffff;
-    /* card color , dividing line */
-    --bg-card: rgba(0, 0, 0, 0.05);
-    --bg-component: #ffffff;
-    --bg-input: rgba(255, 255, 255, 0);
-    --bg-canvas: 246 246 247;
-    --bg-list: 246 246 247;
-    /* Button ,Body text, Input completed text */
-
-    /* #161618 */
-    --text-primary: 22 22 24;
-    --text-secondary: 117 120 122;
-    --text-disabled: #b2b5b7;
-    /* input placeholder color */
-    --text-input-tip: #b2b5b7;
-    /* Input  default color */
-    --border-default: rgba(0, 0, 0, 0.2);
-    /* Input accent color */
-    --border-accent: #000000;
-    --border-button: rgba(0, 0, 0, 0.1);
-    /* Regulators, parsing, switches, variables */
     --accent-primary: 0 190 180;
-    /* Output Variables Box */
-    --bg-accent: rgba(76, 164, 231, 0.05);
-
-    /* --state-success: #3ba05c; */
+    --bg-accent: 76 164 231 / 0.05;
     --state-success: 59 160 92;
-    /* --state-warning: #767573; */
     --state-warning: 250 173 20;
     --state-error: 216 73 75;
-
     --team-group: #5ab77e;
     --team-member: #5c96c8;
     --team-department: #8866d3;
-    --bg-group: rgba(90, 183, 126, 0.1);
-    --bg-member: rgba(92, 150, 200, 0.1);
-    --bg-department: rgba(136, 102, 211, 0.1);
-
-    /* --*-inverse: colors in dark mode */
-    --text-primary-inverse: 246 246 247;
-    --text-secondary-inverse: 178 181 183;
+    --bg-group: 90 183 126 / 0.1;
+    --bg-member: 92 150 200 / 0.1;
+    --bg-department: 136 102 211 / 0.1;
   }
 
-  .dark {
-    --background: rgba(11, 10, 18, 1);
-    --foreground: 213 31% 91%;
+  /* Dark mode overrides */
+  .dark,
+  [data-theme='dark'] {
+    --background: 210 30% 8%;
+    --foreground: 0 0% 98%;
 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --card: 210 25% 12%;
+    --card-foreground: 0 0% 98%;
 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
+    --popover: 210 25% 12%;
+    --popover-foreground: 0 0% 98%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
+    --primary: 190 90% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
+    --secondary: 210 20% 15%;
+    --secondary-foreground: 0 0% 98%;
 
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
+    --muted: 210 20% 18%;
+    --muted-foreground: 210 15% 55%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
+    --accent: 195 85% 45%;
+    --accent-foreground: 0 0% 100%;
 
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --border: 210 20% 18%;
+    --input: 210 20% 18%;
+    --ring: 190 90% 50%;
 
-    --ring: 216 34% 17%;
+    /* Base mappings - Dark */
+    --bg-base: var(--background);
+    --bg-card: 210 25% 11%;
+    --bg-title: 210 20% 10%;
+    /* Darker title background */
+    --bg-component: 210 25% 12%;
+    /* Darker component background */
+    --bg-input: 0 0% 0% / 0;
+    --bg-canvas: 210 30% 6%;
+    --bg-list: 210 30% 6%;
 
-    --radius: 0.5rem;
+    --text-primary: var(--foreground);
+    --text-secondary: 210 15% 65%;
+    --text-disabled: 210 10% 40%;
+    --text-input-tip: 210 10% 40%;
+    --text-primary-inverse: 210 30% 8%;
+    --text-secondary-inverse: 210 15% 30%;
 
-    --background-inverse-standard: rgba(230, 227, 246, 0.15);
-    --background-inverse-standard-foreground: rgba(255, 255, 255, 1);
+    --border-default: 210 20% 18%;
+    /* Maps to --border */
+    --border-accent: 0 0% 100%;
+    /* White border accent for dark mode */
+    --border-button: 0 0% 100% / 0.1;
 
-    --background-inverse-weak: rgba(184, 181, 203, 0.15);
-    --background-inverse-weak-foreground: rgba(255, 255, 255, 1);
-
-    --background-core-standard: rgba(137, 126, 255, 1);
-    --background-core-standard-foreground: rgba(255, 255, 255, 1);
-
-    --background-inverse-strong: rgba(255, 255, 255, 0.15);
-    --background-inverse-strong-foreground: rgba(255, 255, 255, 1);
-
-    --background-core-weak: rgb(101, 75, 248);
-    --background-core-weak-foreground: rgba(255, 255, 255, 1);
-
-    --background-badge: rgba(22, 22, 24, 0.5);
-    --text-badge: rgba(151, 154, 171, 1);
-
-    --colors-background-inverse-standard: rgba(230, 227, 246, 0.15);
-    --colors-background-inverse-strong: rgba(255, 255, 255, 0.8);
-    --colors-background-neutral-standard: rgba(11, 10, 18, 1);
-    --colors-background-neutral-strong: rgba(29, 26, 44, 1);
-    --colors-background-neutral-weak: rgba(17, 16, 23, 1);
-
-    --colors-outline-sentiment-primary: rgba(146, 118, 255, 1);
-    --colors-outline-neutral-strong: rgba(255, 255, 255, 0.15);
-    --colors-outline-neutral-standard: rgba(230, 227, 246, 0.1);
-
-    --colors-text-core-standard: rgba(137, 126, 255, 1);
-    --colors-text-neutral-strong: rgba(255, 255, 255, 1);
-    --colors-text-neutral-standard: rgba(230, 227, 246, 1);
-    --colors-text-neutral-weak: rgba(170, 160, 197, 1);
-    --colors-text-functional-danger: rgba(255, 81, 81, 1);
-    --colors-text-inverse-strong: rgba(17, 16, 23, 1);
-    --colors-text-persist-light: rgba(255, 255, 255, 1);
-    --colors-text-inverse-weak: rgba(84, 80, 106, 1);
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* Sidebar specific - Dark */
+    --sidebar-background: 210 25% 9%;
+    --sidebar-foreground: 210 15% 65%;
+    --sidebar-primary: 190 90% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 210 20% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 210 20% 15%;
+    --sidebar-ring: 190 90% 50%;
 
-    --text-title: rgba(255, 255, 255, 1);
-    --text-sub-title: rgba(91, 93, 106, 1);
-    --text-sub-title-invert: rgba(151, 154, 171, 1);
-    --background-header-bar: rgba(11, 11, 12, 1);
+    /* Custom gradients - Dark */
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(190 90% 50%),
+      hsl(200 85% 55%)
+    );
+    --gradient-glow: linear-gradient(
+      180deg,
+      hsl(190 90% 50% / 0.3),
+      transparent
+    );
+    --gradient-border: linear-gradient(
+      180deg,
+      hsl(190 90% 50%),
+      hsl(200 85% 55%)
+    );
 
-    --text-title-invert: rgba(22, 22, 24, 1);
+    /* Shadows - Dark */
+    --shadow-glow: 0 0 40px hsl(190 90% 50% / 0.2);
+    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
 
-    --background-card: rgba(255, 255, 255, 0.05);
-    --background-note: rgba(255, 255, 255, 0.05);
+    /* Legacy Dark Mode Variables */
+    --background-inverse-standard: 230 227 246 / 0.15;
+    --background-inverse-standard-foreground: 255 255 255;
 
-    --background-highlight: rgba(76, 164, 231, 0.1);
+    --background-inverse-weak: 184 181 203 / 0.15;
+    --background-inverse-weak-foreground: 255 255 255;
 
-    --input-border: rgba(255, 255, 255, 0.2);
+    --background-core-standard: 137 126 255;
+    --background-core-standard-foreground: 255 255 255;
 
-    --metallic: #fafafa;
+    --background-inverse-strong: 255 255 255 / 0.15;
 
-    --bg-title: #38383a;
-    /* design colors */
+    --background-core-weak: 101 75 248;
+    --background-core-weak-foreground: 255 255 255;
 
-    --bg-base: #161618;
-    --bg-card: rgba(255, 255, 255, 0.05);
-    --bg-component: #202025;
-    --bg-input: rgba(255, 255, 255, 0.05);
-    --bg-canvas: 0 0 0;
-    --bg-list: 56 56 58;
+    --background-badge: 22 22 24 / 0.5;
+    --text-badge: 151 154 171;
 
-    /* #f6f6f7 */
-    --text-primary: 246 246 247;
-    --text-secondary: 178 181 183;
-    --text-disabled: #75787a;
-    --text-input-tip: #75787a;
-    --border-default: rgba(255, 255, 255, 0.2);
-    --border-accent: #ffffff;
-    --border-button: rgba(255, 255, 255, 0.1);
+    --colors-background-inverse-standard: 230 227 246 / 0.15;
+    /* Legacy variables dark mode overrides */
+    --colors-text-neutral-strong: 250 250 250;
+    --colors-text-neutral-standard: 160 160 175;
+    --colors-text-neutral-weak: 120 120 140;
+    --text-title: 250 250 250;
+    --text-sub-title: 160 160 175;
+    --text-title-invert: 10 10 15;
+    --text-sub-title-invert: 30 30 40;
 
-    /* *-inverse: colors in light mode */
-    --text-primary-inverse: 22 22 24;
-    --text-secondary-inverse: 117 120 122;
+    --input-border: 255 255 255 / 0.2;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-glow {
+    background: var(--gradient-glow);
+  }
+
+  .gradient-border {
+    background: var(--gradient-border);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
 
@@ -257,6 +289,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-bg-base text-text-primary;
     font-feature-settings:
@@ -269,9 +302,11 @@
   h1 {
     @apply text-2xl font-bold;
   }
+
   h2 {
     @apply text-xl font-semibold;
   }
+
   h3 {
     @apply text-lg font-medium;
   }

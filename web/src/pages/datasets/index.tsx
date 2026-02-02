@@ -1,4 +1,4 @@
-import { CardContainer } from '@/components/card-container';
+import { CardSineLineContainer } from '@/components/card-singleline-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -67,88 +67,88 @@ export default function Datasets() {
       setSearchUrl(searchUrl);
     }
   }, [isCreate, showModal, searchUrl, setSearchUrl]);
+
   return (
-    <>
-      <section className="py-4 flex-1 flex flex-col">
-        {(!kbs?.length || kbs?.length <= 0) && !searchString && (
-          <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
-            <EmptyAppCard
-              showIcon
-              size="large"
-              className="w-[480px] p-14"
-              isSearch={!!searchString}
-              type={EmptyCardType.Dataset}
-              onClick={() => showModal()}
-            />
-          </div>
-        )}
-        {(!!kbs?.length || searchString) && (
-          <>
-            <ListFilterBar
-              title={t('header.dataset')}
-              searchString={searchString}
-              onSearchChange={handleInputChange}
-              value={filterValue}
-              filters={owners}
-              onChange={handleFilterSubmit}
-              className="px-8"
-              icon={'datasets'}
+    <div className="max-w-6xl mx-auto space-y-8 pb-10 w-full px-10 pt-8">
+      {(!kbs?.length || kbs?.length <= 0) && !searchString ? (
+        <div className="flex w-full items-center justify-center py-20">
+          <EmptyAppCard
+            showIcon
+            size="large"
+            className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
+            isSearch={!!searchString}
+            type={EmptyCardType.Dataset}
+            onClick={() => showModal()}
+          />
+        </div>
+      ) : (
+        <>
+          <ListFilterBar
+            title={t('header.dataset')}
+            searchString={searchString}
+            onSearchChange={handleInputChange}
+            value={filterValue}
+            filters={owners}
+            onChange={handleFilterSubmit}
+            icon={'datasets'}
+          >
+            <Button
+              onClick={showModal}
+              className="gradient-primary shadow-glow border-none"
             >
-              <Button onClick={showModal}>
-                <Plus className=" size-2.5" />
-                {t('knowledgeList.createKnowledgeBase')}
-              </Button>
-            </ListFilterBar>
-            {(!kbs?.length || kbs?.length <= 0) && searchString && (
-              <div className="flex w-full items-center justify-center h-[calc(100vh-164px)]">
-                <EmptyAppCard
-                  showIcon
-                  size="large"
-                  className="w-[480px] p-14"
-                  isSearch={!!searchString}
-                  type={EmptyCardType.Dataset}
-                  onClick={() => showModal()}
-                />
-              </div>
-            )}
-            <div className="flex-1">
-              <CardContainer className="max-h-[calc(100dvh-280px)] overflow-auto px-8">
-                {kbs.map((dataset) => {
-                  return (
-                    <DatasetCard
-                      dataset={dataset}
-                      key={dataset.id}
-                      showDatasetRenameModal={showDatasetRenameModal}
-                    ></DatasetCard>
-                  );
-                })}
-              </CardContainer>
+              <Plus className="size-4 mr-2" />
+              {t('knowledgeList.createKnowledgeBase')}
+            </Button>
+          </ListFilterBar>
+          {(!kbs?.length || kbs?.length <= 0) && searchString && (
+            <div className="flex w-full items-center justify-center py-20">
+              <EmptyAppCard
+                showIcon
+                size="large"
+                className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
+                isSearch={!!searchString}
+                type={EmptyCardType.Dataset}
+                onClick={() => showModal()}
+              />
             </div>
-            <div className="mt-8 px-8">
-              <RAGFlowPagination
-                {...pick(pagination, 'current', 'pageSize')}
-                total={total}
-                onChange={handlePageChange}
-              ></RAGFlowPagination>
-            </div>
-          </>
-        )}
-        {visible && (
-          <DatasetCreatingDialog
-            hideModal={hideModal}
-            onOk={onCreateOk}
-            loading={creatingLoading}
-          ></DatasetCreatingDialog>
-        )}
-        {datasetRenameVisible && (
-          <RenameDialog
-            hideModal={hideDatasetRenameModal}
-            onOk={onDatasetRenameOk}
-            initialName={initialDatasetName}
-            loading={datasetRenameLoading}
-          ></RenameDialog>
-        )}
-      </section>
-    </>
+          )}
+          <div className="flex-1">
+            <CardSineLineContainer>
+              {kbs.map((dataset) => {
+                return (
+                  <DatasetCard
+                    dataset={dataset}
+                    key={dataset.id}
+                    showDatasetRenameModal={showDatasetRenameModal}
+                  ></DatasetCard>
+                );
+              })}
+            </CardSineLineContainer>
+          </div>
+          <div className="mt-8 flex justify-end">
+            <RAGFlowPagination
+              {...pick(pagination, 'current', 'pageSize')}
+              total={total}
+              onChange={handlePageChange}
+            ></RAGFlowPagination>
+          </div>
+        </>
+      )}
+      {visible && (
+        <DatasetCreatingDialog
+          hideModal={hideModal}
+          onOk={onCreateOk}
+          loading={creatingLoading}
+        ></DatasetCreatingDialog>
+      )}
+      {datasetRenameVisible && (
+        <RenameDialog
+          hideModal={hideDatasetRenameModal}
+          onOk={onDatasetRenameOk}
+          initialName={initialDatasetName}
+          loading={datasetRenameLoading}
+        ></RenameDialog>
+      )}
+    </div>
   );
 }

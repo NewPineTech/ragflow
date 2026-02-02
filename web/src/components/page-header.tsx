@@ -1,8 +1,18 @@
+import { cn } from '@/lib/utils';
 import { PropsWithChildren } from 'react';
 
-export function PageHeader({ children }: PropsWithChildren) {
+interface IProps {
+  className?: string;
+}
+
+export function PageHeader({ children, className }: PropsWithChildren<IProps>) {
   return (
-    <header className="flex justify-between items-center bg-text-title-invert p-5">
+    <header
+      className={cn(
+        'flex justify-between items-center bg-bg-base p-5',
+        className,
+      )}
+    >
       {children}
     </header>
   );

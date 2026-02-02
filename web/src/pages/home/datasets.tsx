@@ -41,7 +41,7 @@ export function Datasets() {
             {kbs?.length > 0 && (
               <CardSineLineContainer>
                 {kbs
-                  ?.slice(0, 6)
+                  ?.slice(0, 4)
                   .map((dataset) => (
                     <DatasetCard
                       key={dataset.id}
