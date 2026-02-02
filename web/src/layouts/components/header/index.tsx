@@ -59,6 +59,7 @@ const RagHeader = () => {
       style={{
         padding: '16px 0',
         background: colorBgContainer,
+        borderBottom: 'none',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
