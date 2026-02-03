@@ -638,7 +638,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
                     dialog.vector_similarity_weight,
                     doc_ids=attachments,
                     top=dialog.top_k,
-                    aggs=False,
+                    aggs=True,
                     rerank_mdl=rerank_mdl,
                     rank_feature=label_question(" ".join(questions), kbs),
                 )
@@ -700,7 +700,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     prompt = msg[0]["content"]
 
     if "max_tokens" in gen_conf:
-        gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
+        gen_conf["max_tokens"] = max(1, min(gen_conf["max_tokens"], max_tokens - used_token_count))
 
     def decorate_answer(answer):
         nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, initial_answer
@@ -990,7 +990,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
                 attachments = None
 
     if prompt_config.get("keyword", False):
-        questions[-1] += keyword_extraction(chat_mdl, questions[-1])
+        questions[-1] += await keyword_extraction(chat_mdl, questions[-1])
 
     refine_question_ts = timer()
 
@@ -1024,7 +1024,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
                 ),
             )
 
-            for think in reasoner.thinking(kbinfos, " ".join(questions)):
+            async for think in reasoner.thinking(kbinfos, " ".join(questions)):
                 if isinstance(think, str):
                     thought = think
                     knowledges = [t for t in think.split("\n") if t]
@@ -1054,11 +1054,12 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
                             dialog.vector_similarity_weight,
                             doc_ids=attachments,
                             top=dialog.top_k,
-                            aggs=False,
+                            aggs=True,
                             rerank_mdl=rerank_mdl,
                             rank_feature=label_question(" ".join(questions), kbs),
                         )
                         logging.info(f"[CHATV1] 🚀 KB retrieving {len(result['chunks'])} chunks")
+                        result["chunks"] = retriever.retrieval_by_children(result["chunks"], tenant_ids)
 
                         if prompt_config.get("toc_enhance"):
                             cks = retriever.retrieval_by_toc(" ".join(questions), result["chunks"], tenant_ids, chat_mdl, dialog.top_n)
@@ -1180,14 +1181,14 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     # Extract system prompt before message_fit_in to preserve it
     system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
     
-    used_token_count, msg = message_fit_in(msg)
+    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     
     # Ensure system message is preserved (message_fit_in keeps it at index 0)
     prompt = msg[0]["content"] if msg[0]["role"] == "system" else system_prompt
 
     if "max_tokens" in gen_conf:
-        gen_conf["max_tokens"] = min(gen_conf["max_tokens"], max_tokens - used_token_count)
+        gen_conf["max_tokens"] = max(1, min(gen_conf["max_tokens"], max_tokens - used_token_count))
 
     def decorate_answer(answer):
         nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, memory_text
