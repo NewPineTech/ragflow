@@ -67,7 +67,36 @@ def clean_markdown_block(text):
 
     # Remove closing ``` tag with optional whitespace and newlines
     # Matches: optional newline + optional whitespace + ``` + optional whitespace at end
-    text = re.sub(r'\n?\s*```\s*$', '', text)
-
+    
     # Return text with surrounding whitespace removed
+    return text.strip()
+    
+def remove_markdown(text, bypass=True):
+    if bypass:
+        return text
+    if not text:
+        return ""
+    # 1. Remove bold/italic: **text** -> text, *text* -> text
+    text = re.sub(r'(\*\*|__)(.*?)\1', r'\2', text)
+    text = re.sub(r'(\*|_)(.*?)\1', r'\2', text)
+    
+    # 2. Remove headers: # Header -> Header
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+    
+    # 3. Remove links: [text](url) -> text
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    
+    # 4. Remove images: ![alt](url) -> ""
+    text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', '', text)
+    
+    # 5. Remove code block syntax but keep content
+    text = re.sub(r'```\w*\n?(.*?)\n?```', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    
+    # 6. Remove blockquotes: > text -> text
+    text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+    
+    # 7. Remove horizontal rules
+    text = re.sub(r'^\s*([-*_]){3,}\s*$', '', text, flags=re.MULTILINE)
+    
     return text.strip()

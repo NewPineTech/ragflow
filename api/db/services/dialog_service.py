@@ -56,7 +56,7 @@ from rag.prompts.generator import chunks_format, citation_prompt, cross_language
     gen_meta_filter, PROMPT_JINJA_ENV, ASK_SUMMARY, classify_and_respond_prompt, after_classify_and_acknowledge_prompt
 from common.token_utils import num_tokens_from_string
 from rag.utils.tavily_conn import Tavily
-from common.string_utils import remove_redundant_spaces
+from common.string_utils import remove_redundant_spaces, remove_markdown
 
 
 def get_current_datetime_info():
@@ -784,6 +784,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             langfuse_generation.end()
             
 
+        #if prompt_config.get("remove_markdown"):
+        #    answer = remove_markdown(answer)
+        
         return {"answer": think + answer, "reference": refs, "prompt": re.sub(r"\n", "  \n", prompt), "created_at": time.time()}
 
     if langfuse_tracer:
@@ -1181,7 +1184,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     # Extract system prompt before message_fit_in to preserve it
     system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
     
-    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
+    used_token_count, msg = message_fit_in(msg)
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     
     # Ensure system message is preserved (message_fit_in keeps it at index 0)
@@ -1282,6 +1285,9 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             langfuse_output = {"time_elapsed:": re.sub(r"\n", "  \n", langfuse_output), "created_at": time.time()}
             langfuse_generation.update(output=langfuse_output)
             langfuse_generation.end()
+
+        #if prompt_config.get("remove_markdown"):
+        #    answer = remove_markdown(answer)
 
         return {
             "answer": think + answer, 
