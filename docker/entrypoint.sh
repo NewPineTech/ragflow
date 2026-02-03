@@ -196,15 +196,28 @@ function start_mcp_server() {
 function ensure_docling() {
     [[ "${USE_DOCLING}" == "true" ]] || { echo "[docling] disabled by USE_DOCLING"; return 0; }
     
-    # Check if pip is available, skip installation if not
-    if ! python3 -c 'import pip' >/dev/null 2>&1; then
-        echo "[docling] pip not available in venv, skipping docling installation"
+    # Check if docling is already installed
+    if python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('docling') else 1)" >/dev/null 2>&1; then
+        echo "[docling] already installed"
         return 0
     fi
     
     DOCLING_PIN="${DOCLING_VERSION:-==2.58.0}"
-    python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('docling') else 1)" \
-      || python3 -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple --no-cache-dir "docling${DOCLING_PIN}"
+    
+    if command -v uv >/dev/null 2>&1; then
+        echo "[docling] pip not in venv but uv found, installing via uv..."
+        uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple "docling${DOCLING_PIN}"
+        return $?
+    fi
+
+    if python3 -m pip --version >/dev/null 2>&1; then
+        echo "[docling] installing via pip..."
+        python3 -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --extra-index-url https://pypi.org/simple --no-cache-dir "docling${DOCLING_PIN}"
+        return $?
+    fi
+    
+    echo "[docling] neither uv nor pip available, skipping installation"
+    return 0
 }
 
 # -----------------------------------------------------------------------------
