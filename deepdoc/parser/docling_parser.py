@@ -182,7 +182,8 @@ class DoclingParser(RAGFlowPdfParser):
                 continue
             # --- Only keep main content ---
             # Relaxed filter for CV/Resume support
-            if label in ("section_header", "text", "list_item", "enrty_item", "caption", "paragraph"):
+            # Relaxed filter for CV/Resume support
+            if label in ("section_header", "heading", "title", "subtitle", "text", "list_item", "entry_item", "caption", "paragraph", "key_value", "table_cell"):
                 bbox = None
                 if getattr(t, "prov", None):
                     pn = getattr(t.prov[0], "page_no", None)
@@ -341,11 +342,35 @@ class DoclingParser(RAGFlowPdfParser):
         except Exception as e:
             self.logger.warning(f"[Docling] render pages failed: {e}")
 
-        conv = DocumentConverter()  
+        # Try to enable OCR and better structure detection
+        try:
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import PdfFormatOption
+            
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = True
+            pipeline_options.do_table_structure = True
+            
+            conv = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
+        except Exception:
+            self.logger.warning("[Docling] Advanced configuration failed, using default DocumentConverter")
+            conv = DocumentConverter()  
+
         conv_res = conv.convert(str(src_path))
         doc = conv_res.document
         if callback:
             callback(0.7, f"[Docling] Parsed doc: {getattr(doc, 'num_pages', 'n/a')} pages")
+
+        md = ""
+        try:
+            md = conv_res.export_to_markdown()
+        except Exception as e:
+            self.logger.warning(f"[Docling] export to markdown failed: {e}")
 
         sections = self._transfer_to_sections(doc, parse_method=parse_method)
         tables = self._transfer_to_tables(doc)
@@ -361,7 +386,7 @@ class DoclingParser(RAGFlowPdfParser):
 
         if callback:
             callback(1.0, "[Docling] Done.")
-        return sections, tables
+        return sections, tables, md
 
 
 if __name__ == "__main__":
