@@ -171,6 +171,14 @@ class VisionFigureParser:
         for future in as_completed(futures):
             figure_num, txt = future.result()
             if txt:
+                # Filter out refusal messages
+                lower_txt = txt.lower()
+                if any(phrase in lower_txt for phrase in [
+                    "unable to analyze",
+                    "appears to be a logo",
+                    "not a visual data representation"
+                ]):
+                    continue
                 self.descriptions[figure_num] = txt + "\n".join(self.descriptions[figure_num])
 
         self._assemble()
