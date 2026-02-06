@@ -93,35 +93,35 @@ def chunk(filename, binary=None, callback=None, **kwargs):
     logging.debug("chunking resume: " + json.dumps(resume, ensure_ascii=False, indent=2))
 
     field_map = {
-        "name_kwd": "姓名/名字",
-        "name_pinyin_kwd": "姓名拼音/名字拼音",
-        "gender_kwd": "性别（男，女）",
-        "age_int": "年龄/岁/年纪",
-        "phone_kwd": "电话/手机/微信",
-        "email_tks": "email/e-mail/邮箱",
-        "position_name_tks": "职位/职能/岗位/职责",
-        "expect_city_names_tks": "期望城市",
-        "work_exp_flt": "工作年限/工作年份/N年经验/毕业了多少年",
-        "corporation_name_tks": "最近就职(上班)的公司/上一家公司",
+        "name_kwd": "Name",
+        "name_pinyin_kwd": "Name Pinyin",
+        "gender_kwd": "Gender",
+        "age_int": "Age",
+        "phone_kwd": "Phone",
+        "email_tks": "Email",
+        "position_name_tks": "Position",
+        "expect_city_names_tks": "Expected City",
+        "work_exp_flt": "Work Experience",
+        "corporation_name_tks": "Most Recent Company",
 
-        "first_school_name_tks": "第一学历毕业学校",
-        "first_degree_kwd": "第一学历（高中，职高，硕士，本科，博士，初中，中技，中专，专科，专升本，MPA，MBA，EMBA）",
-        "highest_degree_kwd": "最高学历（高中，职高，硕士，本科，博士，初中，中技，中专，专科，专升本，MPA，MBA，EMBA）",
-        "first_major_tks": "第一学历专业",
-        "edu_first_fea_kwd": "第一学历标签（211，留学，双一流，985，海外知名，重点大学，中专，专升本，专科，本科，大专）",
+        "first_school_name_tks": "First Degree School",
+        "first_degree_kwd": "First Degree",
+        "highest_degree_kwd": "Highest Degree",
+        "first_major_tks": "First Degree Major",
+        "edu_first_fea_kwd": "First Degree Features",
 
-        "degree_kwd": "过往学历（高中，职高，硕士，本科，博士，初中，中技，中专，专科，专升本，MPA，MBA，EMBA）",
-        "major_tks": "学过的专业/过往专业",
-        "school_name_tks": "学校/毕业院校",
-        "sch_rank_kwd": "学校标签（顶尖学校，精英学校，优质学校，一般学校）",
-        "edu_fea_kwd": "教育标签（211，留学，双一流，985，海外知名，重点大学，中专，专升本，专科，本科，大专）",
+        "degree_kwd": "Degree",
+        "major_tks": "Major",
+        "school_name_tks": "School",
+        "sch_rank_kwd": "School Rank",
+        "edu_fea_kwd": "Education Features",
 
-        "corp_nm_tks": "就职过的公司/之前的公司/上过班的公司",
-        "edu_end_int": "毕业年份",
-        "industry_name_tks": "所在行业",
+        "corp_nm_tks": "Previous Companies",
+        "edu_end_int": "Graduation Year",
+        "industry_name_tks": "Industry",
 
-        "birth_dt": "生日/出生年份",
-        "expect_position_name_tks": "期望职位/期望职能/期望岗位",
+        "birth_dt": "Birthday",
+        "expect_position_name_tks": "Expected Position",
     }
 
     titles = []
@@ -134,7 +134,7 @@ def chunk(filename, binary=None, callback=None, **kwargs):
         titles.append(str(v))
     doc = {
         "docnm_kwd": filename,
-        "title_tks": rag_tokenizer.tokenize("-".join(titles) + "-简历")
+        "title_tks": rag_tokenizer.tokenize("-".join(titles) + "-Resume")
     }
     doc["title_sm_tks"] = rag_tokenizer.fine_grained_tokenize(doc["title_tks"])
     pairs = []

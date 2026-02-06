@@ -180,11 +180,9 @@ class DoclingParser(RAGFlowPdfParser):
                 continue
             if re.match(r'^\s*(trang|page)?\s*\d+\s*$', lower):  # chỉ số trang
                 continue
-            if len(text.strip()) < 10:  # đoạn quá ngắn
-                continue
-
-            # --- Chỉ lấy nội dung chính ---
-            if (label in ("section_header", "text") and ref in ("#/body",)) or label in ("list_item",):
+            # --- Only keep main content ---
+            # Relaxed filter for CV/Resume support
+            if label in ("section_header", "text", "list_item", "enrty_item", "caption", "paragraph"):
                 bbox = None
                 if getattr(t, "prov", None):
                     pn = getattr(t.prov[0], "page_no", None)
