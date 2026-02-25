@@ -7,6 +7,12 @@ import { Input } from '@/components/originui/input';
 import { SkeletonCard } from '@/components/skeleton-card';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -61,6 +67,13 @@ export default function SearchingView({
   searchData: ISearchAppDetailProps;
 }) {
   const { t } = useTranslation();
+  const [metadataModalVisible, setMetadataModalVisible] = useState(false);
+  const [currentMetadata, setCurrentMetadata] = useState<any>(null);
+
+  const handleShowMetadata = (metadata: any) => {
+    setCurrentMetadata(metadata);
+    setMetadataModalVisible(true);
+  };
   // useEffect(() => {
   //   const changeLanguage = async () => {
   //     await i18n.changeLanguage('zh');
@@ -156,14 +169,14 @@ export default function SearchingView({
           >
             {searchData.search_config.summary && !isSearchStrEmpty && (
               <>
-                <div className="flex justify-start items-start text-text-primary text-2xl">
+                <div className="flex justify-start items-start text-foreground text-2xl font-semibold">
                   {t('search.AISummary')}
                 </div>
                 {isEmpty(answer) && sendingLoading ? (
                   <SkeletonCard className=" mt-2" />
                 ) : (
                   answer.answer && (
-                    <div className="border rounded-lg p-4 mt-3 max-h-52 overflow-auto scrollbar-none">
+                    <div className="border rounded-lg p-4 mt-3 max-h-52 overflow-auto scrollbar-none text-foreground bg-white">
                       <MarkdownContent
                         loading={sendingLoading}
                         content={answer.answer}
@@ -229,14 +242,27 @@ export default function SearchingView({
                               </PopoverContent>
                             </Popover>
                           </div>
-                          <div
-                            className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit mt-3"
-                            onClick={() =>
-                              clickDocumentButton(chunk.doc_id, chunk as any)
-                            }
-                          >
-                            <FileIcon name={chunk.docnm_kwd}></FileIcon>
-                            {chunk.docnm_kwd}
+                          <div className="flex gap-2 items-center mt-3">
+                            <div
+                              className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit cursor-pointer hover:bg-bg-accent"
+                              onClick={() =>
+                                clickDocumentButton(chunk.doc_id, chunk as any)
+                              }
+                            >
+                              <FileIcon name={chunk.docnm_kwd}></FileIcon>
+                              {chunk.docnm_kwd}
+                            </div>
+                            {chunk.cv_metadata_obj && (
+                              <div
+                                className="flex gap-2 items-center text-xs text-blue-600 border border-blue-200 bg-blue-50 p-1 rounded-lg w-fit cursor-pointer hover:bg-blue-100"
+                                onClick={() =>
+                                  handleShowMetadata(chunk.cv_metadata_obj)
+                                }
+                              >
+                                <BrainCircuit className="w-3 h-3" />
+                                {t('knowledgeDetails.metadata') || 'Metadata'}
+                              </div>
+                            )}
                           </div>
                         </div>
                         {index < chunks.length - 1 && (
@@ -333,9 +359,26 @@ export default function SearchingView({
           visible={visible}
           hideModal={hideModal}
           documentId={documentId}
-          chunk={selectedChunk}
+          chunk={selectedChunk as any}
         ></PdfDrawer>
       )}
+      <Dialog
+        open={metadataModalVisible}
+        onOpenChange={(open) => setMetadataModalVisible(open)}
+      >
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {t('knowledgeDetails.metadata') || 'Extraction Metadata'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-4 bg-gray-50 rounded-lg">
+            <pre className="text-xs text-gray-800 whitespace-pre-wrap break-all">
+              {JSON.stringify(currentMetadata, null, 2)}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

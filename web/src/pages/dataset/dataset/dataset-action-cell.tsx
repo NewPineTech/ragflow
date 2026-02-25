@@ -11,7 +11,7 @@ import { IDocumentInfo } from '@/interfaces/database/document';
 import { formatFileSize } from '@/utils/common-util';
 import { formatDate } from '@/utils/date';
 import { downloadDocument } from '@/utils/file-util';
-import { Download, Eye, PenLine, Trash2 } from 'lucide-react';
+import { BrainCircuit, Download, Eye, PenLine, Trash2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { UseRenameDocumentShowType } from './use-rename-document';
 import { isParserRunning } from './utils';
@@ -27,7 +27,11 @@ const FunctionMap = {
 export function DatasetActionCell({
   record,
   showRenameModal,
-}: { record: IDocumentInfo } & UseRenameDocumentShowType) {
+  showManageMetadataModal,
+}: {
+  record: IDocumentInfo;
+  showManageMetadataModal: (record: IDocumentInfo) => void;
+} & UseRenameDocumentShowType) {
   const { id, run, type } = record;
   const isRunning = isParserRunning(run);
   const isVirtualDocument = type === DocumentType.Virtual;
@@ -59,6 +63,16 @@ export function DatasetActionCell({
         onClick={handleRename}
       >
         <PenLine />
+      </Button>
+      <Button
+        variant="transparent"
+        className="border-none hover:bg-bg-card text-blue-600"
+        size={'sm'}
+        disabled={isRunning}
+        onClick={() => showManageMetadataModal(record)}
+        title="Metadata"
+      >
+        <BrainCircuit className="w-4 h-4" />
       </Button>
       <HoverCard>
         <HoverCardTrigger>

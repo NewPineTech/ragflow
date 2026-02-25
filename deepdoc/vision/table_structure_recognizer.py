@@ -112,7 +112,7 @@ class TableStructureRecognizer(Recognizer):
 
     @staticmethod
     def is_caption(bx):
-        patt = [r"[图表]+[ 0-9:：]{2,}"]
+        patt = [r"[table]+[ 0-9:：]{2,}"]
         if any([re.match(p, bx["text"].strip()) for p in patt]) or bx.get("layout_type", "").find("caption") >= 0:
             return True
         return False
@@ -400,7 +400,7 @@ class TableStructureRecognizer(Recognizer):
         headers = {}
         hdrset = set()
         lst_hdr = []
-        de = "的" if not is_english else " for "
+        de = " for "
         for r in sorted(list(hdr_rowno)):
             headers[r] = ["" for _ in range(clmno)]
             for i in range(clmno):
@@ -488,7 +488,7 @@ class TableStructureRecognizer(Recognizer):
             if is_english:
                 from_ = " in "
             else:
-                from_ = "来自"
+                from_ = " from "
             row_txt = [t + f"\t——{from_}“{cap}”" for t in row_txt]
         return row_txt
 

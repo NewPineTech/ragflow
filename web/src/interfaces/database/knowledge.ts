@@ -131,6 +131,7 @@ export interface IChunk {
   tag_kwd?: string[];
   positions: number[][];
   tag_feas?: Record<string, number>;
+  cv_metadata_obj?: any;
 }
 
 export interface ITestingChunk {
@@ -151,6 +152,7 @@ export interface ITestingChunk {
   positions: number[][];
   docnm_kwd: string;
   doc_type_kwd: string;
+  cv_metadata_obj?: any;
 }
 
 export interface ITestingDocument {

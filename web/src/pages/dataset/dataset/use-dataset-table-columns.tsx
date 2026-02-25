@@ -213,6 +213,26 @@ export function useDatasetTableColumns({
           <DatasetActionCell
             record={record}
             showRenameModal={showRenameModal}
+            showManageMetadataModal={(row) =>
+              showManageMetadataModal({
+                metadata: util.JSONToMetaDataTableData(row.meta_fields || {}),
+                isCanAdd: true,
+                type: MetadataType.UpdateSingle,
+                record: row,
+                title: (
+                  <div className="flex flex-col gap-2">
+                    <div className="text-base font-normal">
+                      {t('metadata.editMetadata')}
+                    </div>
+                    <div className="text-sm text-text-secondary">
+                      {t('metadata.editMetadataForDataset')}
+                      {row.name}
+                    </div>
+                  </div>
+                ),
+                isDeleteSingleValue: true,
+              })
+            }
           ></DatasetActionCell>
         );
       },

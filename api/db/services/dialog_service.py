@@ -956,7 +956,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     # Try SQL retrieval if field mapping exists
     if field_map:
         logging.debug("[CHATV1] Attempting SQL retrieval: {}".format(questions[-1]))
-        ans = use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
+        ans = await use_sql(questions[-1], field_map, dialog.tenant_id, chat_mdl, prompt_config.get("quote", True), dialog.kb_ids)
         if ans:
             yield ans
             return

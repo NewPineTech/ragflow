@@ -3,7 +3,7 @@ import SvgIcon from '@/components/svg-icon';
 import { IReferenceChunk, IReferenceObject } from '@/interfaces/database/chat';
 import { getExtension } from '@/utils/document-util';
 import DOMPurify from 'dompurify';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import Markdown from 'react-markdown';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import rehypeKatex from 'rehype-katex';
@@ -24,7 +24,6 @@ import {
 } from '@/utils/chat';
 
 import { useFetchDocumentThumbnailsByIds } from '@/hooks/use-document-request';
-import { cn } from '@/lib/utils';
 import classNames from 'classnames';
 import { omit } from 'lodash';
 import { pipe } from 'lodash/fp';
@@ -35,11 +34,7 @@ import {
   shouldShowCarousel,
 } from '../markdown-content/reference-utils';
 import { Button } from '../ui/button';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '../ui/hover-card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import styles from './index.less';
 
 // Helper function to convert IReferenceObject to IReference
@@ -70,6 +65,10 @@ function MarkdownContent({
   const { t } = useTranslation();
   const { setDocumentIds, data: fileThumbnails } =
     useFetchDocumentThumbnailsByIds();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedChunkIndex, setSelectedChunkIndex] = useState<number | null>(
+    null,
+  );
   const contentWithCursor = useMemo(() => {
     let text = DOMPurify.sanitize(content, {
       ADD_TAGS: ['think', 'section'],
@@ -153,7 +152,7 @@ function MarkdownContent({
     [fileThumbnails, reference],
   );
 
-  const renderPopoverContent = useCallback(
+  const renderDialogContent = useCallback(
     (chunkIndex: number) => {
       const {
         documentUrl,
@@ -166,29 +165,16 @@ function MarkdownContent({
       } = getReferenceInfo(chunkIndex);
 
       return (
-        <div key={chunkItem?.id} className="flex gap-2">
+        <div key={chunkItem?.id} className="flex gap-2 max-w-md">
           {imageId && (
-            <HoverCard>
-              <HoverCardTrigger>
-                <Image
-                  id={imageId}
-                  className={styles.referenceChunkImage}
-                ></Image>
-              </HoverCardTrigger>
-              <HoverCardContent>
-                <Image
-                  id={imageId}
-                  className={cn(styles.referenceImagePreview)}
-                ></Image>
-              </HoverCardContent>
-            </HoverCard>
+            <Image id={imageId} className={styles.referenceChunkImage}></Image>
           )}
-          <div className={'space-y-2 max-w-[40vw] w-full'}>
+          <div className={'space-y-2 min-w-0 flex-1'}>
             <div
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(chunkItem?.content ?? ''),
               }}
-              className={classNames(styles.chunkContentText, 'w-full')}
+              className={classNames(styles.chunkContentText, 'break-words')}
             ></div>
             {documentId && (
               <div className="flex gap-1">
@@ -287,14 +273,17 @@ function MarkdownContent({
               );
             } else {
               elements.push(
-                <HoverCard key={ref.id}>
-                  <HoverCardTrigger>
-                    <CircleAlert className="size-4 inline-block" />
-                  </HoverCardTrigger>
-                  <HoverCardContent className="max-w-3xl">
-                    {renderPopoverContent(chunkIndex)}
-                  </HoverCardContent>
-                </HoverCard>,
+                <button
+                  key={ref.id}
+                  type="button"
+                  className="inline-block cursor-pointer"
+                  onClick={() => {
+                    setSelectedChunkIndex(chunkIndex);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <CircleAlert className="size-4 inline-block text-blue-500 hover:text-blue-700" />
+                </button>,
               );
             }
           });
@@ -310,7 +299,7 @@ function MarkdownContent({
       return elements;
     },
     [
-      renderPopoverContent,
+      renderDialogContent,
       getReferenceInfo,
       handleDocumentButtonClick,
       reference,
@@ -319,41 +308,54 @@ function MarkdownContent({
   );
 
   return (
-    <Markdown
-      rehypePlugins={[rehypeWrapReference, rehypeKatex, rehypeRaw]}
-      remarkPlugins={[remarkGfm, remarkMath]}
-      className={styles.markdownContentWrapper}
-      components={
-        {
-          'custom-typography': ({ children }: { children: string }) =>
-            renderReference(children),
-          code(props: any) {
-            const { children, className, ...rest } = props;
-            const restProps = omit(rest, 'node');
-            const match = /language-(\w+)/.exec(className || '');
-            return match ? (
-              <SyntaxHighlighter
-                {...restProps}
-                PreTag="div"
-                language={match[1]}
-                wrapLongLines
-              >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            ) : (
-              <code
-                {...restProps}
-                className={classNames(className, 'text-wrap')}
-              >
-                {children}
-              </code>
-            );
-          },
-        } as any
-      }
-    >
-      {contentWithCursor}
-    </Markdown>
+    <>
+      <Markdown
+        rehypePlugins={[rehypeWrapReference, rehypeKatex, rehypeRaw]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        className={styles.markdownContentWrapper}
+        components={
+          {
+            'custom-typography': ({ children }: { children: string }) =>
+              renderReference(children),
+            code(props: any) {
+              const { children, className, ...rest } = props;
+              const restProps = omit(rest, 'node');
+              const match = /language-(\w+)/.exec(className || '');
+              return match ? (
+                <SyntaxHighlighter
+                  {...restProps}
+                  PreTag="div"
+                  language={match[1]}
+                  wrapLongLines
+                >
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              ) : (
+                <code
+                  {...restProps}
+                  className={classNames(className, 'text-wrap')}
+                >
+                  {children}
+                </code>
+              );
+            },
+          } as any
+        }
+      >
+        {contentWithCursor}
+      </Markdown>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('chat.references')}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {selectedChunkIndex !== null &&
+              renderDialogContent(selectedChunkIndex)}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -151,9 +151,16 @@ def cache_retrieval(ttl: int = 60):
             vector_similarity_weight = args[start_idx + 7] if len(args) > start_idx + 7 else kwargs.get("vector_similarity_weight", 0.3)
             top_k = args[start_idx + 8] if len(args) > start_idx + 8 else kwargs.get("top", 5)
             
+            # Create a cleanup copy of kwargs to avoid "multiple values for argument" error
+            # as these are already passed as positional/explicit arguments to _make_cache_key
+            cache_kwargs = kwargs.copy()
+            for k in ["query", "kb_ids", "top_k", "similarity_threshold", "vector_similarity_weight", "top"]:
+                if k in cache_kwargs:
+                    del cache_kwargs[k]
+
             # Generate cache key
             cache_key = _make_cache_key(func.__name__, query, kb_ids, top_k, 
-                                       similarity_threshold, vector_similarity_weight, **kwargs)
+                                       similarity_threshold, vector_similarity_weight, **cache_kwargs)
             
             print(f"[CACHE] Key: {cache_key}... for query: {str(query)[:50]}...")
             print(f"[CACHE] Params: similarity_threshold={similarity_threshold}, vector_weight={vector_similarity_weight}")

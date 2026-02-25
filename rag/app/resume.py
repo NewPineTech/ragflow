@@ -21,7 +21,8 @@ from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMBundle
 from common.constants import LLMType
 from rag.nlp import rag_tokenizer
-from deepdoc.parser.docling_parser import DoclingParser
+from deepdoc.parser.pdf_parser import RAGFlowPdfParser
+from api.db.services.document_service import DocumentService
 
 
 forbidden_select_fields4resume = [
@@ -39,31 +40,41 @@ def chunk(filename, binary=None, callback=None, **kwargs):
         with open(filename, "rb") as f:
             binary = f.read()
 
-    callback(0.2, "Extracting text using Docling...")
+    callback(0.1, "Extracting text using OCR...")
     
-    # 1. Use DoclingParser to get full text
-    parser = DoclingParser()
+    # 1. Use RAGFlowPdfParser to get full text with OCR
+    parser = RAGFlowPdfParser()
     try:
-        def docling_callback(prog, msg):
+        def ocr_callback(prog, msg):
             if callback:
-                # Scale Docling's 0.0-1.0 to 0.2-0.4 range in resume process
-                scaled_prog = 0.2 + (max(0, min(prog, 1.0)) * 0.2)
+                # Scale OCR's 0.0-1.0 to 0.1-0.5 range in resume process
+                scaled_prog = 0.1 + (max(0, min(prog, 1.0)) * 0.4)
                 callback(scaled_prog, msg)
 
-        sections, _, markdown_text = parser.parse_pdf(filepath=filename, binary=binary, callback=docling_callback)
+        # Parse into bboxes which contain all the extracted text
+        # Pass raw bytes directly, not BytesIO
+        parser.parse_into_bboxes(binary, callback=ocr_callback, zoomin=3)
+        
+        # Extract all text from the boxes
+        all_boxes = parser.boxes
+        
+        # Sort boxes by reading order (page, column, vertical position)
+        sorted_boxes = sorted(all_boxes, key=lambda b: (
+            b.get("page_number", 0),
+            b.get("col_id", 0),
+            b.get("top", 0)
+        ))
+        
+        # Build full text from all boxes
+        full_text = "\n".join([
+            box.get("text", "").strip() 
+            for box in sorted_boxes 
+            if box.get("text", "").strip()
+        ])
+        
     except Exception as e:
-        callback(-1, f"Docling parsing failed: {str(e)}")
+        callback(-1, f"OCR parsing failed: {str(e)}")
         raise e
-
-    # Combine markdown if available with any unique text from sections to be safer
-    full_text = markdown_text if markdown_text else ""
-    sections_text = "\n".join([sec[0] for sec in sections if sec[0]])
-    
-    if not full_text:
-        full_text = sections_text
-    elif sections_text and len(sections_text) > len(full_text) * 1.5:
-        # If sections text is significantly larger, combine them
-        full_text = full_text + "\n\n--- Additional Sections ---\n" + sections_text
 
     # 2. Use LLM to extract structured data
     callback(0.4, "Using LLM to extract details...")
@@ -155,12 +166,40 @@ Resume:
         
         doc["email_tks"] = structured_data.get("email", "")
         doc["phone_kwd"] = structured_data.get("phone", "")
-        doc["gender_kwd"] = "男" if structured_data.get("gender") == "M" else ("女" if structured_data.get("gender") == "F" else "")
-        if structured_data.get("birth"):
-            doc["birth_dt"] = structured_data["birth"]
+        doc["gender_kwd"] = "Male" if structured_data.get("gender") == "M" else ("Female" if structured_data.get("gender") == "F" else "")
+        
+        # Omit birth_dt if it's empty or the string "Empty" to avoid Elasticsearch parsing errors
+        birth_val = structured_data.get("birth")
+        if birth_val and str(birth_val).strip() and str(birth_val).lower() != "empty":
+            doc["birth_dt"] = birth_val
+            
         doc["address_kwd"] = structured_data.get("address", "")
         doc["position_name_tks"] = structured_data.get("position", "")
         
+        
+        # Save structured data to Document meta_fields in DB
+        doc_id = kwargs.get("doc_id")
+        if doc_id:
+            DocumentService.update_meta_fields(doc_id, structured_data)
+        
+        # Candidate Avatar Extraction: Look for a small-to-medium figure on the first page
+        avatar_img = None
+        first_page_figures = [b for b in all_boxes if b.get("layout_type") == "figure" and b.get("page_number") == 1]
+        if first_page_figures:
+            # Sort by top position to find header images first
+            sorted_figs = sorted(first_page_figures, key=lambda b: b.get("top", 0))
+            for fig in sorted_figs:
+                w = fig.get("x1", 0) - fig.get("x0", 0)
+                h = fig.get("bottom", 0) - fig.get("top", 0)
+                # Filter for typical avatar sizes (square-ish, not full page or background strips)
+                if 20 < w < 250 and 20 < h < 250:
+                    avatar_img = fig.get("image")
+                    if avatar_img:
+                        break
+        
+        if avatar_img:
+            doc["image"] = avatar_img
+
         # Format a summary section from education, work, projects, etc.
         summary_parts = []
         if structured_data.get("summary"):
@@ -203,6 +242,10 @@ Resume:
 
     doc["content_ltks"] = rag_tokenizer.tokenize(doc["content_with_weight"])
     doc["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(doc["content_ltks"])
+
+    # Add all extracted structured data to metadata
+    if structured_data:
+        doc["cv_metadata_obj"] = structured_data
 
     KnowledgebaseService.update_parser_config(
         kwargs["kb_id"], {"field_map": field_map})

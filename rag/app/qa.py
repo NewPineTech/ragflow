@@ -265,8 +265,8 @@ def rmPrefix(txt):
 
 
 def beAdocPdf(d, q, a, eng, image, poss):
-    qprefix = "Question: " if eng else "问题："
-    aprefix = "Answer: " if eng else "回答："
+    qprefix = "Question: "
+    aprefix = "Answer: "
     d["content_with_weight"] = "\t".join(
         [qprefix + rmPrefix(q), aprefix + rmPrefix(a)])
     d["content_ltks"] = rag_tokenizer.tokenize(q)
@@ -279,8 +279,8 @@ def beAdocPdf(d, q, a, eng, image, poss):
 
 
 def beAdocDocx(d, q, a, eng, image, row_num=-1):
-    qprefix = "Question: " if eng else "问题："
-    aprefix = "Answer: " if eng else "回答："
+    qprefix = "Question: "
+    aprefix = "Answer: "
     d["content_with_weight"] = "\t".join(
         [qprefix + rmPrefix(q), aprefix + rmPrefix(a)])
     d["content_ltks"] = rag_tokenizer.tokenize(q)
@@ -294,8 +294,8 @@ def beAdocDocx(d, q, a, eng, image, row_num=-1):
 
 
 def beAdoc(d, q, a, eng, row_num=-1):
-    qprefix = "Question: " if eng else "问题："
-    aprefix = "Answer: " if eng else "回答："
+    qprefix = "Question: "
+    aprefix = "Answer: "
     d["content_with_weight"] = "\t".join(
         [qprefix + rmPrefix(q), aprefix + rmPrefix(a)])
     d["content_ltks"] = rag_tokenizer.tokenize(q)

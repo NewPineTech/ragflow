@@ -131,10 +131,11 @@ export const ManageMetadataModal = (props: IManageModalProps) => {
         accessorKey: 'values',
         header: () => <span>{t('knowledgeDetails.metadata.values')}</span>,
         cell: ({ row }) => {
-          const values = row.getValue('values') as Array<string>;
+          const values = (row.getValue('values') || []) as Array<string>;
           return (
             <div className="flex items-center gap-1">
-              {values.length > 0 &&
+              {Array.isArray(values) &&
+                values.length > 0 &&
                 values
                   .filter((value: string, index: number) => index < 2)
                   ?.map((value: string) => {

@@ -702,6 +702,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       maxTokensMinMessage: '最大令牌数不能小于 0。',
       quote: '显示引文',
       quoteTip: '是否应该显示原文出处？',
+      references: '引用',
       selfRag: 'Self-RAG',
       selfRagTip: '请参考: https://huggingface.co/papers/2310.11511',
       overview: '聊天 ID',

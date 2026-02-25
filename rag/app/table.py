@@ -361,7 +361,7 @@ def chunk(filename, binary=None, from_page=0, to_page=10000000000, lang="Chinese
     enumerate values using brackets like 'gender/sex(male, female)'.
     Here are some examples for headers:
         1. supplier/vendor\tcolor(yellow, red, brown)\tgender/sex(male, female)\tsize(M,L,XL,XXL)
-        2. 姓名/名字\t电话/手机/微信\t最高学历（高中，职高，硕士，本科，博士，初中，中技，中专，专科，专升本，MPA，MBA，EMBA）
+        2. Name\tPhone/Mobile/WeChat\tDegree (High School, Vocational, Master, Bachelor, Doctorate, etc.)
 
     Every row in table will be treated as a chunk.
     """

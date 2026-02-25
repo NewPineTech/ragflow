@@ -449,6 +449,7 @@ export default {
       maxTokensMinMessage: 'Token tối đa không thể nhỏ hơn 0.',
       quote: 'Hiển thị Trích dẫn',
       quoteTip: 'Nguồn văn bản gốc có nên được hiển thị không?',
+      references: 'Tài liệu tham khảo',
       selfRag: 'Tự RAG',
       selfRagTip:
         'Vui lòng tham khảo: https://huggingface.co/papers/2310.11511',

@@ -35,14 +35,23 @@ export const util = {
     });
   },
 
-  JSONToMetaDataTableData(
-    data: Record<string, string | string[]>,
-  ): IMetaDataTableData[] {
+  JSONToMetaDataTableData(data: Record<string, any>): IMetaDataTableData[] {
     return Object.entries(data).map(([key, value]) => {
+      let values: string[] = [];
+      if (Array.isArray(value)) {
+        values = value.map((v) =>
+          typeof v === 'object' ? JSON.stringify(v) : v?.toString() || '',
+        );
+      } else if (typeof value === 'object' && value !== null) {
+        values = [JSON.stringify(value)];
+      } else {
+        values = [value?.toString() || ''];
+      }
+
       return {
         field: key,
         description: '',
-        values: value,
+        values: values,
       } as IMetaDataTableData;
     });
   },

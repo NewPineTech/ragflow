@@ -73,7 +73,7 @@ class Pdf(PdfParser):
 
         def _begin(txt):
             return re.match(
-                "[0-9. 一、i]*(introduction|abstract|摘要|引言|keywords|key words|关键词|background|背景|目录|前言|contents)",
+                "[0-9. 一、i]*(introduction|abstract|keywords|key words|background|contents)",
                 txt.lower().strip())
 
         if from_page > 0:
@@ -110,7 +110,7 @@ class Pdf(PdfParser):
             b = self.boxes[i]
             i += 1
             txt = b["text"].lower().strip()
-            if re.match("(abstract|摘要)", txt):
+            if re.match("(abstract)", txt):
                 if len(txt.split()) > 32 or len(txt) > 64:
                     abstr = txt + self._line_tag(b, zoomin)
                     break
@@ -209,7 +209,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
     if paper["abstract"]:
         d = copy.deepcopy(doc)
         txt = pdf_parser.remove_tag(paper["abstract"])
-        d["important_kwd"] = ["abstract", "总结", "概括", "summary", "summarize"]
+        d["important_kwd"] = ["abstract", "summary", "summarize"]
         d["important_tks"] = " ".join(d["important_kwd"])
         d["image"], poss = pdf_parser.crop(
             paper["abstract"], need_position=True)
