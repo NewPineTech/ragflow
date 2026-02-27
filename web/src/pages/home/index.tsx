@@ -34,17 +34,17 @@ const Home = () => {
       <section className="px-10 grid grid-cols-1 md:grid-cols-3 gap-4">
         <HomeStatsCard
           label="Total Agents"
-          value={agentLoading ? '...' : agentData?.total ?? 0}
+          value={agentLoading ? '...' : (agentData?.total ?? 0)}
           icon={<Bot size={18} />}
         />
         <HomeStatsCard
           label="Total chatbots"
-          value={dialogLoading ? '...' : dialogData?.total ?? 0}
+          value={dialogLoading ? '...' : (dialogData?.total ?? 0)}
           icon={<MessageSquare size={18} />}
         />
         <HomeStatsCard
           label="Total datasets"
-          value={knowledgeLoading ? '...' : knowledgeList?.length ?? 0}
+          value={knowledgeLoading ? '...' : (knowledgeList?.length ?? 0)}
           icon={<Database size={18} />}
         />
       </section>
@@ -57,8 +57,7 @@ const Home = () => {
           <QuickActionCard
             title="Create AI Agent"
             description="Build a custom AI agent with your own knowledge base and personality"
-            icon={<Bot size={24} className="text-white" />}
-            gradient
+            icon={<Bot size={24} className="text-primary" />}
             onClick={() => handleNavigate('/agents', 'isCreate=true')}
           />
           <QuickActionCard

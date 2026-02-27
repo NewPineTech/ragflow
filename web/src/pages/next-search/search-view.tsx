@@ -100,7 +100,7 @@ export default function SearchingView({
       >
         <h1
           className={cn(
-            'text-4xl font-bold bg-gradient-to-l from-[#40EBE3] to-[#4A51FF] bg-clip-text cursor-pointer',
+            'text-4xl font-bold bg-gradient-to-l from-[#0D9394] to-[#0A6B6B] bg-clip-text cursor-pointer',
           )}
           onClick={() => {
             setIsSearching?.(false);
@@ -176,7 +176,7 @@ export default function SearchingView({
                   <SkeletonCard className=" mt-2" />
                 ) : (
                   answer.answer && (
-                    <div className="border rounded-lg p-4 mt-3 max-h-52 overflow-auto scrollbar-none text-foreground bg-white">
+                    <div className="border rounded-lg p-4 mt-3 max-h-52 overflow-auto scrollbar-none text-foreground bg-bg-card">
                       <MarkdownContent
                         loading={sendingLoading}
                         content={answer.answer}
@@ -254,7 +254,7 @@ export default function SearchingView({
                             </div>
                             {chunk.cv_metadata_obj && (
                               <div
-                                className="flex gap-2 items-center text-xs text-blue-600 border border-blue-200 bg-blue-50 p-1 rounded-lg w-fit cursor-pointer hover:bg-blue-100"
+                                className="flex gap-2 items-center text-xs text-primary border border-primary/20 bg-primary/5 p-1 rounded-lg w-fit cursor-pointer hover:bg-primary/10"
                                 onClick={() =>
                                   handleShowMetadata(chunk.cv_metadata_obj)
                                 }
@@ -273,6 +273,7 @@ export default function SearchingView({
                   })}
                 </>
               )}
+
               {relatedQuestions?.length > 0 &&
                 searchData.search_config.related_search && (
                   <>
@@ -372,8 +373,8 @@ export default function SearchingView({
               {t('knowledgeDetails.metadata') || 'Extraction Metadata'}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-auto p-4 bg-gray-50 rounded-lg">
-            <pre className="text-xs text-gray-800 whitespace-pre-wrap break-all">
+          <div className="flex-1 overflow-auto p-4 bg-bg-card rounded-lg border border-border-button">
+            <pre className="text-xs text-text-primary whitespace-pre-wrap break-all">
               {JSON.stringify(currentMetadata, null, 2)}
             </pre>
           </div>

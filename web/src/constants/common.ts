@@ -39,25 +39,29 @@ export const fileIconMap = {
   xml: 'xml.svg',
 };
 
-export const LanguageList = ['English', 'Vietnamese'];
+export const LanguageList = ['English', 'Vietnamese', 'Chinese'];
 export const LanguageMap = {
   English: 'English',
   Vietnamese: 'Tiếng việt',
+  Chinese: '中文',
 };
 
 export enum LanguageAbbreviation {
   En = 'en',
   Vi = 'vi',
+  Zh = 'zh',
 }
 
 export const LanguageAbbreviationMap = {
   [LanguageAbbreviation.En]: 'English',
   [LanguageAbbreviation.Vi]: 'Tiếng việt',
+  [LanguageAbbreviation.Zh]: '中文',
 };
 
 export const LanguageTranslationMap = {
   English: 'en',
   Vietnamese: 'vi',
+  Chinese: 'zh',
 };
 
 export enum FileMimeType {

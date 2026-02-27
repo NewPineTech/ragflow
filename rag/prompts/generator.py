@@ -237,8 +237,10 @@ async def full_question(tenant_id=None, llm_id=None, messages=[], language=None,
         conversation=conversation,
         language=language,
     )
+    msg = [{"role": "system", "content": rendered_prompt}, {"role": "user", "content": "Output: "}]
+    _, msg = message_fit_in(msg, chat_mdl.max_length)
 
-    ans = await chat_mdl.async_chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+    ans = await chat_mdl.async_chat(msg[0]["content"], msg[1:], {"temperature": 0.2})
     ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
     return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]
 
@@ -278,7 +280,7 @@ async def content_tagging(chat_mdl, content, all_tags, examples, topn=3):
 
     msg = [{"role": "system", "content": rendered_prompt}, {"role": "user", "content": "Output: "}]
     _, msg = message_fit_in(msg, chat_mdl.max_length)
-    kwd = await chat_mdl.async_chat(rendered_prompt, msg[1:], {"temperature": 0.5})
+    kwd = await chat_mdl.async_chat(msg[0]["content"], msg[1:], {"temperature": 0.5})
     if isinstance(kwd, tuple):
         kwd = kwd[0]
     kwd = re.sub(r"^.*</think>", "", kwd, flags=re.DOTALL)
@@ -543,9 +545,10 @@ def short_memory(tenant_id=None, llm_id=None, messages=[], short_memory=None, la
         content=conversation,
         old_memory=short_memory,
     )
-
+    msg = [{"role": "system", "content": rendered_prompt}, {"role": "user", "content": "Output: "}]
+    _, msg = message_fit_in(msg, chat_mdl.max_length)   
     ans = chat_mdl._run_coroutine_sync(
-        chat_mdl.async_chat(rendered_prompt, [{"role": "user", "content": "Output: "}])
+        chat_mdl.async_chat(msg[0]["content"], msg[1:], {"temperature": 0.2})
     )
     ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
     return ans if ans.find("**ERROR**") < 0 else messages[-1]["content"]

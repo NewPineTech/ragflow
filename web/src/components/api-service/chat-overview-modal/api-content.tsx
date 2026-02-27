@@ -47,7 +47,10 @@ const ApiContent = ({
         <div style={{ position: 'relative' }}>
           <MarkdownToc content={apiDoc} />
         </div>
-        <MarkdownPreview source={apiDoc}></MarkdownPreview>
+        <MarkdownPreview
+          source={apiDoc}
+          style={{ padding: '0 10px 0 10px' }}
+        ></MarkdownPreview>
       </Flex>
       {apiKeyVisible && (
         <ChatApiKeyModal

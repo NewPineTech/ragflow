@@ -79,7 +79,7 @@ export default function Dataset() {
     setRowSelection,
   });
   return (
-    <section className="p-8 min-w-[880px]">
+    <section className="px-10 py-6 min-w-[850px]">
       <ListFilterBar
         title="Dataset"
         icon="dataset"

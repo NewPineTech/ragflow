@@ -117,12 +117,12 @@ const RetrievalDocuments = ({
           <Button
             onClick={handleTogglePopover}
             className={cn(
-              'flex w-full px-3 rounded-md text-base font-medium text-foreground border border-border-default min-h-10 h-auto items-center justify-between bg-white hover:bg-gray-50 shadow-sm transition-colors',
+              'flex w-full px-3 rounded-md text-base font-medium text-foreground border border-border-default min-h-10 h-auto items-center justify-between bg-bg-base hover:bg-primary/5 shadow-sm transition-colors',
             )}
           >
             <div className="flex justify-between items-center w-full">
               <div className="flex flex-wrap items-center gap-2">
-                <Files className="size-4 text-gray-500" />
+                <Files className="size-4 text-text-secondary" />
                 <span className="text-foreground">
                   {selectedDocumentIds?.length ?? 0}/{useDocuments?.length ?? 0}
                 </span>
@@ -130,14 +130,14 @@ const RetrievalDocuments = ({
               </div>
               <div className="flex items-center">
                 <XIcon
-                  className="h-4 w-4 mx-2 cursor-pointer text-gray-400 hover:text-gray-600"
+                  className="h-4 w-4 mx-2 cursor-pointer text-text-secondary hover:text-text-primary"
                   onClick={(event) => {
                     event.stopPropagation();
                     handleClear();
                   }}
                 />
                 <Separator orientation="vertical" className="mx-1 h-4" />
-                <ChevronDown className="h-4 w-4 mx-2 text-gray-400" />
+                <ChevronDown className="h-4 w-4 mx-2 text-text-secondary" />
               </div>
             </div>
           </Button>

@@ -414,7 +414,7 @@ const FileLogsTable: FC<FileLogsTableProps> = ({
   });
 
   return (
-    <div className="w-full h-[calc(100vh-360px)]">
+    <div className="max-w-[calc(100vw-340px)] h-[calc(100vh-360px)]">
       <Table rootClassName="max-h-[calc(100vh-380px)]">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -430,7 +430,7 @@ const FileLogsTable: FC<FileLogsTableProps> = ({
             </TableRow>
           ))}
         </TableHeader>
-        <TableBody className="relative min-w-[1280px] overflow-auto">
+        <TableBody className="relative overflow-auto">
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
@@ -460,7 +460,7 @@ const FileLogsTable: FC<FileLogsTableProps> = ({
           )}
         </TableBody>
       </Table>
-      <div className="flex items-center justify-end absolute bottom-3 right-12">
+      <div className="flex items-center justify-end absolute mt-2 right-10">
         <div className="space-x-2">
           <RAGFlowPagination
             {...{ current: pagination.current, pageSize: pagination.pageSize }}

@@ -93,7 +93,7 @@ export function SpreadsheetFormFields({ prefix }: CommonProps) {
         <>
           <RAGFlowFormItem
             name={buildFieldNameWithPrefix('table_result_type', prefix)}
-            label={t('flow.tableResultType') || '表格返回形式'}
+            label={t('flow.tableResultType')}
           >
             {(field) => (
               <SelectWithSearch
@@ -108,7 +108,7 @@ export function SpreadsheetFormFields({ prefix }: CommonProps) {
               'markdown_image_response_type',
               prefix,
             )}
-            label={t('flow.markdownImageResponseType') || '图片返回形式'}
+            label={t('flow.markdownImageResponseType')}
           >
             {(field) => (
               <SelectWithSearch

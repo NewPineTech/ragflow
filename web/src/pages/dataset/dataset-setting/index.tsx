@@ -248,7 +248,7 @@ export default function DatasetSettings() {
   };
 
   return (
-    <section className="p-5 h-full flex flex-col">
+    <section className="px-10 py-6 h-full flex flex-col">
       <TopTitle
         title={t('knowledgeDetails.configuration')}
         description={t('knowledgeConfiguration.titleDescription')}

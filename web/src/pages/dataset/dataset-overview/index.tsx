@@ -247,7 +247,7 @@ const FileLogsPage: FC = () => {
   const isDark = useIsDarkTheme();
 
   return (
-    <div className="p-5 min-w-[880px] border-border border rounded-lg mr-5">
+    <div className="ml-5 px-5 py-6 border-border border rounded-lg mr-5">
       {/* Stats Cards */}
       <div className="grid grid-cols-3 md:grid-cols-3 gap-4 mb-6">
         <StatCard

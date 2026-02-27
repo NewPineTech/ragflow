@@ -15,6 +15,7 @@
 #
 
 import copy
+import logging
 import re
 from collections import defaultdict
 from io import BytesIO
@@ -34,21 +35,31 @@ class Ppt(PptParser):
         txts = super().__call__(fnm, from_page, to_page)
 
         callback(0.5, "Text extraction finished.")
-        import aspose.slides as slides
-        import aspose.pydrawing as drawing
         imgs = []
-        with slides.Presentation(BytesIO(fnm)) as presentation:
-            for i, slide in enumerate(presentation.slides[from_page: to_page]):
-                try:
+        aspose_ok = False
+        try:
+            import aspose.slides as slides
+            import aspose.pydrawing as drawing
+            with slides.Presentation(BytesIO(fnm)) as presentation:
+                for i, slide in enumerate(presentation.slides[from_page: to_page]):
                     with BytesIO() as buffered:
+                        # Increase scale to 1.0 for full-resolution thumbnails
                         slide.get_thumbnail(
-                            0.1, 0.1).save(
+                            1.0, 1.0).save(
                             buffered, drawing.imaging.ImageFormat.jpeg)
                         buffered.seek(0)
                         imgs.append(Image.open(buffered).copy())
-                except RuntimeError as e:
-                    raise RuntimeError(
-                        f'ppt parse error at page {i + 1}, original error: {str(e)}') from e
+            aspose_ok = True
+            logging.info("PPT slides rendered successfully using aspose-slides.")
+        except ImportError:
+            logging.warning("aspose-slides is not available. Falling back to PIL rendering.")
+        except Exception as e:
+            logging.warning(f"aspose-slides failed ({e}). Falling back to PIL rendering.")
+
+        if not aspose_ok:
+            # Fallback: do not capture images for chunks if aspose fails
+            imgs = [None] * len(txts)
+            logging.warning(f"PPT slide images skipped due to aspose failure. {len(imgs)} pages text-only.")
         assert len(imgs) == len(
             txts), "Slides text and image do not match: {} vs. {}".format(
             len(imgs), len(txts))
@@ -191,7 +202,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
             d["doc_type_kwd"] = "image"
             d["page_num_int"] = [pn + 1]
             d["top_int"] = [0]
-            d["position_int"] = [(pn + 1, 0, img.size[0], 0, img.size[1])]
+            d["position_int"] = [(pn + 1, 0, img.size[0] if img else 0, 0, img.size[1] if img else 0)]
             tokenize(d, txt, eng)
             res.append(d)
         return res

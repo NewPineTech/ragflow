@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 210 40% 10%;
 
-    --primary: 190 90% 50%;
+    --primary: 180 84% 31%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 20% 94%;
@@ -23,7 +23,7 @@
     --muted: 210 20% 94%;
     --muted-foreground: 210 15% 45%;
 
-    --accent: 195 85% 45%;
+    --accent: 180 84% 28%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -31,7 +31,7 @@
 
     --border: 210 20% 88%;
     --input: 210 20% 88%;
-    --ring: 190 90% 50%;
+    --ring: 180 84% 31%;
 
     --radius: 0.75rem;
 
@@ -59,32 +59,32 @@
     /* Sidebar specific - Light */
     --sidebar-background: 210 25% 97%;
     --sidebar-foreground: 210 20% 40%;
-    --sidebar-primary: 190 90% 50%;
+    --sidebar-primary: 180 84% 31%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 20% 92%;
     --sidebar-accent-foreground: 210 40% 15%;
     --sidebar-border: 210 20% 90%;
-    --sidebar-ring: 190 90% 50%;
+    --sidebar-ring: 180 84% 31%;
 
     /* Custom gradients - Light */
     --gradient-primary: linear-gradient(
       135deg,
-      hsl(190 90% 50%),
-      hsl(200 85% 55%)
+      hsl(180 84% 31%),
+      hsl(190 80% 35%)
     );
     --gradient-glow: linear-gradient(
       180deg,
-      hsl(190 90% 50% / 0.2),
+      hsl(180 84% 31% / 0.2),
       transparent
     );
     --gradient-border: linear-gradient(
       180deg,
-      hsl(190 90% 50%),
-      hsl(200 85% 55%)
+      hsl(180 84% 31%),
+      hsl(190 80% 35%)
     );
 
     /* Shadows - Light */
-    --shadow-glow: 0 0 40px hsl(190 90% 50% / 0.15);
+    --shadow-glow: 0 0 40px hsl(180 84% 31% / 0.15);
     --shadow-card: 0 4px 24px hsl(210 40% 10% / 0.08);
 
     /* Legacy Variables Preserved/Overridden as needed */
@@ -97,7 +97,7 @@
     /* white */
     --colors-background-neutral-strong: 226 223 246;
 
-    --button-blue-text: 22 119 255;
+    --button-blue-text: 13 147 148;
 
     --colors-outline-sentiment-primary: 127 105 255;
     --colors-outline-neutral-strong: 112 107 107 / 0.15;
@@ -150,7 +150,7 @@
     --popover: 210 25% 12%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 190 90% 50%;
+    --primary: 180 84% 31%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 20% 15%;
@@ -159,7 +159,7 @@
     --muted: 210 20% 18%;
     --muted-foreground: 210 15% 55%;
 
-    --accent: 195 85% 45%;
+    --accent: 180 84% 28%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 45%;
@@ -167,7 +167,7 @@
 
     --border: 210 20% 18%;
     --input: 210 20% 18%;
-    --ring: 190 90% 50%;
+    --ring: 180 84% 31%;
 
     /* Base mappings - Dark */
     --bg-base: var(--background);
@@ -196,32 +196,32 @@
     /* Sidebar specific - Dark */
     --sidebar-background: 210 25% 9%;
     --sidebar-foreground: 210 15% 65%;
-    --sidebar-primary: 190 90% 50%;
+    --sidebar-primary: 180 84% 31%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 20% 15%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 210 20% 15%;
-    --sidebar-ring: 190 90% 50%;
+    --sidebar-ring: 180 84% 31%;
 
     /* Custom gradients - Dark */
     --gradient-primary: linear-gradient(
       135deg,
-      hsl(190 90% 50%),
-      hsl(200 85% 55%)
+      hsl(180 84% 31%),
+      hsl(190 80% 35%)
     );
     --gradient-glow: linear-gradient(
       180deg,
-      hsl(190 90% 50% / 0.3),
+      hsl(180 84% 31% / 0.3),
       transparent
     );
     --gradient-border: linear-gradient(
       180deg,
-      hsl(190 90% 50%),
-      hsl(200 85% 55%)
+      hsl(180 84% 31%),
+      hsl(190 80% 35%)
     );
 
     /* Shadows - Dark */
-    --shadow-glow: 0 0 40px hsl(190 90% 50% / 0.2);
+    --shadow-glow: 0 0 40px hsl(180 84% 31% / 0.2);
     --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
 
     /* Legacy Dark Mode Variables */

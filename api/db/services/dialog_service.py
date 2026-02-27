@@ -24,6 +24,7 @@ from functools import partial
 from timeit import default_timer as timer
 from langfuse import Langfuse
 from peewee import fn
+import json
 
 # Suppress LiteLLM async task warnings
 warnings.filterwarnings("ignore", message=".*coroutine.*was never awaited.*")
@@ -375,27 +376,25 @@ def classify_and_respond(dialog, messages, stream=True):
                 yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
     else:
+        classify_type = None
         answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(system_content, msg, dialog.llm_setting))
+        logging.info(f"Assistant: {answer}")
         
         # Extract classification
         if "[CLASSIFY:KB]" in answer:
-            logging.info(f"[CLASSIFY_AND_RESPOND] Non-stream: Detected KB classification")
-            yield "KB"  # Yield string to signal KB needed
-            return  # Stop generator after yielding classification
+            classify_type = "KB"
         elif "[CLASSIFY:GREET]" in answer:
             classify_type = "GREET"
-            answer = answer.replace("[CLASSIFY:GREET]", "").strip()
         elif "[CLASSIFY:SENSITIVE]" in answer:
             classify_type = "SENSITIVE"
-            answer = answer.replace("[CLASSIFY:SENSITIVE]", "").strip()
         else:
             # Fallback: No classification found, default to KB
             logging.warning(f"[CLASSIFY_AND_RESPOND] Non-stream: No classification detected,  Answer: {answer[:100]}...")
-            yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
-            return
-        
-        logging.info(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {answer}")
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+            classify_type = "KB"
+        clean_answer = answer.replace("[CLASSIFY:KB]", "").replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
+
+        logging.info(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {clean_answer}")
+        yield {"answer": clean_answer, "reference": {}, "audio_binary": tts(tts_mdl, clean_answer), "prompt": "", "created_at": time.time(), "classify_type": classify_type}
 
 
 def chat_solo(dialog, messages, stream=True, memory_text=None):
@@ -677,10 +676,11 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
      
     gen_conf = dialog.llm_setting
 
-    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
+
+    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs) + prompt4citation}]
     
     # Nếu có memory, chỉ gửi câu hỏi cuối cùng (memory đã chứa context lịch sử)
     # Nếu không có memory, gửi toàn bộ lịch sử chat
@@ -798,7 +798,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     if stream:
         last_ans = ""
         answer = ""
-        async for ans in chat_mdl.async_chat_streamly(prompt + prompt4citation, msg[1:], gen_conf):
+        async for ans in chat_mdl.async_chat_streamly(prompt, msg[1:], gen_conf):
             if thought:
                 ans = re.sub(r"^.*</think>", "", ans, flags=re.DOTALL)
             answer = ans
@@ -820,7 +820,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             yield {"answer": combined_answer, "reference": {}, "audio_binary": None}
         yield decorate_answer(thought + answer)
     else:
-        answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf)
+        answer = await chat_mdl.async_chat(prompt, msg[1:], gen_conf)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
@@ -837,6 +837,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     3. ✅ Memory optimization (only last message when memory exists)
     4. ✅ No TTS blocking during streaming
     5. ✅ Early flush for instant feedback
+    6. ✅ Fixed max_tokens truncation (Stream=False)
     
     Args:
         dialog: Dialog object with config
@@ -851,10 +852,8 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         dict: Response chunks with answer, reference, audio_binary
     """
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
-    current_message=messages[-1]["content"]
     # Lấy short_memory từ kwargs nếu có (đã được load từ Redis)
     memory_text = kwargs.pop("short_memory", None)
-    
     # 🚀 OPTIMIZATION: Classify + Respond in ONE LLM call (2x faster than separate calls)
     # Returns immediately if KB not needed, otherwise proceeds with retrieval
     result_gen = classify_and_respond(dialog, messages, stream)
@@ -924,7 +923,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     else:
         llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
 
-    max_tokens = llm_model_config.get("max_tokens", 1024)
+    max_tokens = llm_model_config.get("max_tokens", 8000)
     check_llm_ts = timer()
    
     langfuse_tracer = None
@@ -971,6 +970,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     
    
     if len(questions) > 1:   #and prompt_config.get("refine_multiturn"):
+        logging.info("[CHATV1] Messages: {}, Memory: {}".format(json.dumps(messages, ensure_ascii=False), "Yes" if memory_text else "No"))
         questions = [chat_mdl._run_coroutine_sync(full_question(dialog.tenant_id, dialog.llm_id, messages, chat_mdl=chat_mdl))]
     else:
         questions = questions[-1:]
@@ -1147,7 +1147,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     
     if memory_text:
         system_parts.append(f"\n## MEMORY:\n{memory_text}")
-        logging.info(f"[CHATV1] Memory added: {memory_text}...")
+        #logging.info(f"[CHATV1] Memory added: {memory_text}...")
    
     if knowledges:
         kwargs["knowledge"] = "\n\n------\n\n".join(knowledges)
@@ -1158,40 +1158,41 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         system_parts.append(f"\n## What you already said to user:\n{kb_initial_response}")
         system_parts.append(f"\n{after_classify_and_acknowledge_prompt()}\n")
     
-    # Single system message for better LLM compatibility
-    msg = [{"role": "system", "content": "".join(system_parts)}]
-
-    
-
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
     
+    # Single system message for better LLM compatibility
+    msg = [{"role": "system", "content": "".join(system_parts) + prompt4citation}]
+    
     # 🎯 MEMORY OPTIMIZATION: Only send last message if memory exists
     if memory_text:
-        logging.info("[CHATV1] Using memory - sending only last user message")
+        #logging.info("[CHATV1] Using memory - sending only last user message")
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", " ".join(questions))} 
                     for m in messages[-1:] if m["role"] != "system"])
-        logging.debug(f"[CHATV1] memory - Last message sent: {msg}")
+        #logging.debug(f"[CHATV1] memory - Last message sent: {msg}")
     else:
-        logging.info("[CHATV1] No memory - sending full conversation history")
+        #logging.info("[CHATV1] No memory - sending full conversation history")
         msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} 
                     for m in messages if m["role"] != "system"])
         #replace last user message with questions
         msg[-1]["content"] = re.sub(r"##\d+\$\$", "", " ".join(questions))
-        logging.debug(f"[CHATV1] memory - Full messages sent: {msg}")
+        #logging.debug(f"[CHATV1] memory - Full messages sent: {msg}")
     
     # Extract system prompt before message_fit_in to preserve it
     system_prompt = msg[0]["content"] if msg and msg[0]["role"] == "system" else ""
-    
-    used_token_count, msg = message_fit_in(msg)
+    logging.info(f"[CHATV1] max tokens: {max_tokens}")
+    used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
-    
+    logging.info(f"[CHATV1] messages fit:  {len(msg[0]['content'])} {used_token_count}")
+
     # Ensure system message is preserved (message_fit_in keeps it at index 0)
     prompt = msg[0]["content"] if msg[0]["role"] == "system" else system_prompt
 
     if "max_tokens" in gen_conf:
         gen_conf["max_tokens"] = max(1, min(gen_conf["max_tokens"], max_tokens - used_token_count))
+    else:
+        gen_conf["max_tokens"] = max(1, max_tokens - used_token_count)
 
     def decorate_answer(answer):
         nonlocal embd_mdl, prompt_config, knowledges, kwargs, kbinfos, prompt, retrieval_ts, questions, langfuse_tracer, memory_text
@@ -1304,7 +1305,8 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         )
 
     if stream:
-        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, prompt + prompt4citation, msg[1:], gen_conf):
+        logging.info(f"[CHATV1] Streaming answer")
+        for answer, delta_ans, is_final in stream_llm_with_delta_check(chat_mdl, prompt, msg[1:], gen_conf):
             # Remove </think> tags if thought mode enabled
             if thought:
                 answer = re.sub(r"^.*</think>", "", answer, flags=re.DOTALL)
@@ -1317,7 +1319,8 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         final_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
         yield decorate_answer(final_answer)
     else:
-        answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf))
+        logging.info(f"[CHATV1] Non-streaming answer")
+        answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(prompt, msg[1:], gen_conf))
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
         # Prepend kb_initial_response to non-streaming answer too

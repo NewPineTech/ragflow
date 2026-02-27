@@ -1,5 +1,5 @@
 module.exports = {
-  'primary-color': '#338AFF', // '#338AFF',
+  'primary-color': '#0D9394', // '#338AFF',
   'border-radius-base': '4px',
   // 'menu-dark-color': '',
   // 'menu-dark-danger-color': '',

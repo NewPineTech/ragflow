@@ -20,8 +20,8 @@ from pptx import Presentation
 
 
 class RAGFlowPptParser:
-    def __init__(self):
-        super().__init__()
+    # Fix P2: removed pointless __init__ that only called super().__init__()
+    # on a class with no explicit base class.
 
     def __get_bulleted_text(self, paragraph):
         is_bulleted = bool(paragraph._p.xpath("./a:pPr/a:buChar")) or bool(paragraph._p.xpath("./a:pPr/a:buAutoNum")) or bool(paragraph._p.xpath("./a:pPr/a:buBlip"))
@@ -51,12 +51,18 @@ class RAGFlowPptParser:
                 return ""
 
             # Handle table
+            # Fix P1: guard against None cell text and check value, not cell object truthiness
             if shape_type == 19:
                 tb = shape.table
                 rows = []
                 for i in range(1, len(tb.rows)):
-                    rows.append("; ".join([tb.cell(
-                        0, j).text + ": " + tb.cell(i, j).text for j in range(len(tb.columns)) if tb.cell(i, j)]))
+                    row_parts = []
+                    for j in range(len(tb.columns)):
+                        header = tb.cell(0, j).text or ""
+                        value = tb.cell(i, j).text or ""
+                        if value:
+                            row_parts.append(f"{header}: {value}" if header else value)
+                    rows.append("; ".join(row_parts))
                 return "\n".join(rows)
 
             # Handle group shape
@@ -75,9 +81,13 @@ class RAGFlowPptParser:
             return ""
 
     def __call__(self, fnm, from_page, to_page, callback=None):
-        ppt = Presentation(fnm) if isinstance(
-            fnm, str) else Presentation(
-            BytesIO(fnm))
+        # Fix P3: wrap Presentation open with error handling
+        try:
+            ppt = Presentation(fnm) if isinstance(fnm, str) else Presentation(BytesIO(fnm))
+        except Exception as e:
+            logging.error(f"Failed to open PowerPoint file: {e}")
+            return []
+
         txts = []
         self.total_page = len(ppt.slides)
         for i, slide in enumerate(ppt.slides):
@@ -86,11 +96,30 @@ class RAGFlowPptParser:
             if i >= to_page:
                 break
             texts = []
-            for shape in sorted(
-                    slide.shapes, key=lambda x: ((x.top if x.top is not None else 0) // 10, x.left if x.left is not None else 0)):
-                txt = self.__extract(shape)
-                if txt:
-                    texts.append(txt)
+            try:
+                def _safe_sort_key(shape):
+                    try:
+                        top = shape.top if shape.top is not None else 0
+                        left = shape.left if shape.left is not None else 0
+                        return (top // 10, left)
+                    except (AttributeError, TypeError):
+                        return (0, 0)
+
+                for shape in sorted(slide.shapes, key=_safe_sort_key):
+                    try:
+                        txt = self.__extract(shape)
+                        if txt:
+                            texts.append(txt)
+                    except AttributeError as e:
+                        logging.warning(f"Skipping shape on slide {i + 1} due to: {e}")
+                        continue
+            except AttributeError as e:
+                logging.warning(f"Error iterating shapes on slide {i + 1}: {e}")
+
+            # Fix P4: invoke callback to report progress (previously accepted but never called)
+            if callback:
+                callback((i + 1) / len(ppt.slides), f"Slide {i + 1}/{len(ppt.slides)}")
+
             txts.append("\n".join(texts))
 
         return txts

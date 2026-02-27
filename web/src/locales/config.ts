@@ -6,17 +6,20 @@ import { LanguageAbbreviation } from '@/constants/common';
 import translation_en from './en';
 import { createTranslationTable, flattenObject } from './until';
 import translation_vi from './vi';
+import translation_zh from './zh';
 
 const resources = {
   [LanguageAbbreviation.En]: translation_en,
   [LanguageAbbreviation.Vi]: translation_vi,
+  [LanguageAbbreviation.Zh]: translation_zh,
 };
 const enFlattened = flattenObject(translation_en);
 const viFlattened = flattenObject(translation_vi);
+const zhFlattened = flattenObject(translation_zh);
 
 export const translationTable = createTranslationTable(
-  [enFlattened, viFlattened],
-  ['English', 'Vietnamese'],
+  [enFlattened, viFlattened, zhFlattened],
+  ['English', 'Vietnamese', 'Chinese'],
 );
 i18n
   .use(initReactI18next)

@@ -99,12 +99,9 @@ class Base(ABC):
 
         return LLMErrorCode.ERROR_GENERIC
 
-    def _clean_conf(self, gen_conf):
-        if "max_tokens" in gen_conf:
-            del gen_conf["max_tokens"]
-
         allowed_conf = {
             "temperature",
+            "max_tokens",
             "max_completion_tokens",
             "top_p",
             "stream",
@@ -1276,7 +1273,7 @@ class LiteLLMBase(ABC):
             if not hist or hist[0].get("role") != "system":
                 hist.insert(0, {"role": "system", "content": system})
 
-        logging.info("[HISTORY]" + json.dumps(hist, ensure_ascii=False, indent=2))
+        #logging.info("[HISTORY]" + json.dumps(hist, ensure_ascii=False, indent=2))
         if self.model_name.lower().find("qwen3") >= 0:
             kwargs["extra_body"] = {"enable_thinking": False}
 
@@ -1307,7 +1304,7 @@ class LiteLLMBase(ABC):
     async def async_chat_streamly(self, system, history, gen_conf, **kwargs):
         if system and history and history[0].get("role") != "system":
             history.insert(0, {"role": "system", "content": system})
-        logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
+        #logging.info("[HISTORY STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=4))
         gen_conf = self._clean_conf(gen_conf)
         reasoning_start = False
         total_tokens = 0

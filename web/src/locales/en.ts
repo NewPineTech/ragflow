@@ -2416,5 +2416,88 @@ Important structured information may include: names, dates, locations, events, k
       timeout: 'Timeout',
       fail: 'Fail',
     },
+    knowledgeGraph: {
+      mock: {
+        nodes: {
+          org1: 'Xiamen Xiangyu',
+          org1Desc:
+            'Xiamen Xiangyu is a company whose operating income and market share changed between 2018 and 2022.',
+          event2018: '2018',
+          event2018Desc:
+            '2018 is a point in time, marking the beginning of the record of Xiamen Xiangyus operating income and market share.',
+          event2019: '2019',
+          event2019Desc:
+            '2019 is a point in time, and Xiamen Xiangyus operating revenue and market share changed during this period.',
+          event2020: '2020',
+          event2020Desc:
+            '2020 is a point in time, and Xiamen Xiangyus operating revenue and market share changed during this period.',
+          event2021: '2021',
+          event2021Desc:
+            '2021 is a point in time, and Xiamen Xiangyus operating revenue and market share changed during this period.',
+          event2022: '2022',
+          event2022Desc:
+            '2022 is a point in time, and Xiamen Xiangyus operating revenue and market share changed during this period.',
+          org2: 'Xiamen Xiangyu Co.,Ltd.',
+          org2Desc:
+            'Xiamen Xiangyu Co., Ltd. is a company, referred to in Chinese as Xiamen Xiangyu, in English as Xiamen Xiangyu Co., Ltd., abbreviated in English as Xiangyu, with Deng Qidong as its legal representative.',
+          person1: 'Deng Qidong',
+          person1Desc:
+            'Deng Qidong is the legal representative of Xiamen Xiangyu Co., Ltd.',
+          geo1: 'Xiamen',
+          geo1Desc:
+            'Xiamen is a geographic location related to Xiamen Xiangyu Co., Ltd.',
+          person2: 'Liao Jie',
+          person2Desc:
+            'Liao Jie is the Board Secretary, responsible for handling board-related matters and communications.',
+          person3: 'Shi Jingyang',
+          person3Desc:
+            'Shi Jingyang is the Securities Affairs Representative, responsible for handling securities-related matters and communications.',
+          geo2: 'Xiamen Free Trade Zone, Huli District',
+          geo2Desc:
+            "A geographic location in Xiamen, specifically in the Free Trade Zone, where the company's office is situated.",
+          geo3: 'Xiangyu Group Building',
+          geo3Desc:
+            "The building where the company's office is located, situated at Xiangyu Road, Xiamen.",
+          event2021Title: 'Year 2021',
+          event2021TitleDesc:
+            'Refers to the year 2021, used for comparing financial metrics with the year 2022.',
+          event2022Title: 'Year 2022',
+          event2022TitleDesc:
+            'Refers to the year 2022, used for presenting current financial metrics and comparing them with the year 2021.',
+          financialMetrics: 'Main Financial Metrics',
+          financialMetricsDesc:
+            'Indicates the focus on key financial metrics in the table, such as weighted averages and percentages.',
+        },
+        edges: {
+          edge1Desc:
+            'Xiamen Xiangyu’s revenue and market share in 2018 were recorded.',
+          edge2Desc:
+            'Xiamen Xiangyu’s revenue and market share changed in 2019.',
+          edge3Desc:
+            'Xiamen Xiangyu’s revenue and market share changed in 2020.',
+          edge4Desc:
+            'Xiamen Xiangyu’s revenue and market share changed in 2021.',
+          edge5Desc:
+            'Xiamen Xiangyu’s revenue and market share changed in 2022.',
+          edge6Desc:
+            'The legal representative of Xiamen Xiangyu Co., Ltd. is Deng Qidong.',
+          edge7Desc: 'Xiamen Xiangyu Co., Ltd. is located in Xiamen.',
+          edge8Desc:
+            "Liao Jie's office is located in the Xiangyu Group Building, indicating his workplace.",
+          edge9Desc:
+            'Liao Jie works in the Xiamen Free Trade Zone, a specific area within Xiamen.',
+          edge10Desc:
+            "Shi Jingyang's office is also located in the Xiangyu Group Building, indicating his workplace.",
+          edge11Desc:
+            'Shi Jingyang works in the Xiamen Free Trade Zone, a specific area within Xiamen.',
+          edge12Desc:
+            'The years 2021 and 2022 are related as they are used for comparing financial metrics, showing changes and adjustments over time.',
+          edge13Desc:
+            "The 'Main Financial Metrics' is related to the year 2021 as it provides the basis for financial comparisons and adjustments.",
+          edge14Desc:
+            "The 'Main Financial Metrics' is related to the year 2022 as it presents the current financial metrics and their changes compared to 2021.",
+        },
+      },
+    },
   },
 };

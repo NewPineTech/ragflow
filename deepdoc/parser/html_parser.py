@@ -15,16 +15,17 @@
 #  limitations under the License.
 #
 
-from rag.nlp import find_codec, rag_tokenizer
-import uuid
-import chardet
-from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 import html
+import logging  # Fix H5
+import uuid
+from copy import copy
 
-def get_encoding(file):
-    with open(file,'rb') as f:
-        tmp = chardet.detect(f.read())
-        return tmp['encoding']
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+
+from rag.nlp import find_codec, rag_tokenizer
+
+# Fix H3: removed standalone get_encoding() + chardet import.
+# Encoding detection is now unified on find_codec (already imported above).
 
 BLOCK_TAGS = [
     "h1", "h2", "h3", "h4", "h5", "h6",
@@ -33,7 +34,8 @@ BLOCK_TAGS = [
     "table", "pre", "code", "blockquote",
     "figure", "figcaption"
 ]
-TITLE_TAGS = {"h1": "#", "h2": "##", "h3": "###", "h4": "#####", "h5": "#####", "h6": "######"}
+# Fix H1: h4 had 5 hashes instead of 4
+TITLE_TAGS = {"h1": "#", "h2": "##", "h3": "###", "h4": "####", "h5": "#####", "h6": "######"}
 
 
 class RAGFlowHtmlParser:
@@ -42,8 +44,11 @@ class RAGFlowHtmlParser:
             encoding = find_codec(binary)
             txt = binary.decode(encoding, errors="ignore")
         else:
-            with open(fnm, "r",encoding=get_encoding(fnm)) as f:
-                txt = f.read()
+            # Fix H3: use find_codec instead of the removed get_encoding/chardet
+            with open(fnm, "rb") as f:
+                raw = f.read()
+            encoding = find_codec(raw)
+            txt = raw.decode(encoding, errors="ignore")
         return self.parser_txt(txt, chunk_token_num)
 
     @classmethod
@@ -68,7 +73,9 @@ class RAGFlowHtmlParser:
         for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
             comment.extract()
 
-        cls.read_text_recursively(soup.body, temp_sections, chunk_token_num=chunk_token_num)
+        # Fix H2: fall back to soup itself if <body> is absent (HTML fragments)
+        root = soup.body or soup
+        cls.read_text_recursively(root, temp_sections, chunk_token_num=chunk_token_num)
         block_txt_list, table_list = cls.merge_block_text(temp_sections)
         sections = cls.chunk_block(block_txt_list, chunk_token_num=chunk_token_num)
         for table in table_list:
@@ -98,7 +105,8 @@ class RAGFlowHtmlParser:
         for table_rows in tables:
             new_table = soup.new_tag("table")
             for row in table_rows:
-                new_table.append(row)
+                # Fix H6: copy rows to avoid mutating the original soup tree
+                new_table.append(copy(row))
             table_str_list.append(str(new_table))
 
         return table_str_list
@@ -108,18 +116,16 @@ class RAGFlowHtmlParser:
         if isinstance(element, NavigableString):
             content = element.strip()
 
-            def is_valid_html(content):
-                try:
-                    soup = BeautifulSoup(content, "html.parser")
-                    return bool(soup.find())
-                except Exception:
-                    return False
-
+            # Fix H4: combine the two redundant BeautifulSoup parses into one
             return_info = []
             if content:
-                if is_valid_html(content):
-                    soup = BeautifulSoup(content, "html.parser")
-                    child_info = cls.read_text_recursively(soup, parser_result, chunk_token_num, element.name, block_id)
+                try:
+                    re_soup = BeautifulSoup(content, "html.parser")
+                except Exception:
+                    re_soup = None
+
+                if re_soup and re_soup.find():
+                    child_info = cls.read_text_recursively(re_soup, parser_result, chunk_token_num, element.name, block_id)
                     parser_result.extend(child_info)
                 else:
                     info = {"content": element.strip(), "tag_name": "inner_text", "metadata": {"block_id": block_id}}
@@ -210,4 +216,3 @@ class RAGFlowHtmlParser:
             chunks.append(current_block)
 
         return chunks
-

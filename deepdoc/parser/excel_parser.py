@@ -136,10 +136,14 @@ class RAGFlowExcelParser:
                         span = "single_cell"
                     else:
                         span = "multi_cell"
-                else:
+                elif hasattr(anchor, "_from"):
                     r1, c1 = anchor._from.row + 1, anchor._from.col + 1
                     r2, c2 = r1, c1
                     span = "single_cell"
+                else:
+                    # Fix E1: absolute-position anchors have neither _from nor _to
+                    r1, c1, r2, c2 = 0, 0, 0, 0
+                    span = "unknown"
 
                 item = {
                     "sheet": sheetname or ws.title,
@@ -202,7 +206,7 @@ class RAGFlowExcelParser:
         return tb_chunks
 
     def markdown(self, fnm):
-        import pandas as pd
+        # Fix E5: removed redundant `import pandas as pd` (already imported at module level)
 
         file_like_object = BytesIO(fnm) if not isinstance(fnm, str) else fnm
         try:
@@ -235,7 +239,8 @@ class RAGFlowExcelParser:
                 for i, c in enumerate(r):
                     if not c.value:
                         continue
-                    t = str(ti[i].value) if i < len(ti) else ""
+                    # Fix E4: guard against header row shorter than data row and None header values
+                    t = str(ti[i].value) if i < len(ti) and ti[i].value is not None else ""
                     t += ("：" if t else "") + str(c.value)
                     fields.append(t)
                 line = "; ".join(fields)
@@ -249,20 +254,27 @@ class RAGFlowExcelParser:
         if fnm.split(".")[-1].lower().find("xls") >= 0:
             wb = RAGFlowExcelParser._load_excel_to_workbook(BytesIO(binary))
             total = 0
-            
-            for sheetname in wb.sheetnames:
-               try:
-                   ws = wb[sheetname]
-                   total += len(list(ws.rows))
-               except Exception as e:
-                   logging.warning(f"Skip sheet '{sheetname}' due to rows access error: {e}")
-                   continue
+            # Fix E3: ensure workbook is closed to avoid leaking file handles
+            try:
+                for sheetname in wb.sheetnames:
+                    try:
+                        ws = wb[sheetname]
+                        total += len(list(ws.rows))
+                    except Exception as e:
+                        logging.warning(f"Skip sheet '{sheetname}' due to rows access error: {e}")
+                        continue
+            finally:
+                wb.close()
             return total
 
         if fnm.split(".")[-1].lower() in ["csv", "txt"]:
             encoding = find_codec(binary)
             txt = binary.decode(encoding, errors="ignore")
             return len(txt.split("\n"))
+
+        # Fix E2: return 0 instead of implicit None for unknown file types
+        logging.warning(f"Unknown file extension for row counting: {fnm}")
+        return 0
 
 
 if __name__ == "__main__":

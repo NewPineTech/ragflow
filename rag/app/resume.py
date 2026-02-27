@@ -17,6 +17,8 @@
 import logging
 import re
 import json
+from io import BytesIO
+from PIL import Image
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMBundle
 from common.constants import LLMType
@@ -182,23 +184,47 @@ Resume:
         if doc_id:
             DocumentService.update_meta_fields(doc_id, structured_data)
         
-        # Candidate Avatar Extraction: Look for a small-to-medium figure on the first page
-        avatar_img = None
-        first_page_figures = [b for b in all_boxes if b.get("layout_type") == "figure" and b.get("page_number") == 1]
-        if first_page_figures:
-            # Sort by top position to find header images first
-            sorted_figs = sorted(first_page_figures, key=lambda b: b.get("top", 0))
-            for fig in sorted_figs:
-                w = fig.get("x1", 0) - fig.get("x0", 0)
-                h = fig.get("bottom", 0) - fig.get("top", 0)
-                # Filter for typical avatar sizes (square-ish, not full page or background strips)
-                if 20 < w < 250 and 20 < h < 250:
-                    avatar_img = fig.get("image")
-                    if avatar_img:
-                        break
-        
-        if avatar_img:
-            doc["image"] = avatar_img
+        # Candidate Avatar Extraction: collect all candidates and pick the best one
+        avatar_candidates = []  # list of (pixel_area, image)
+
+        # Method 1: Look for figure-type boxes across all pages
+        figure_boxes = [b for b in all_boxes if b.get("layout_type") == "figure"]
+        for fig in figure_boxes:
+            w = fig.get("x1", 0) - fig.get("x0", 0)
+            h = fig.get("bottom", 0) - fig.get("top", 0)
+            img = fig.get("image")
+            # Filter: skip full-page backgrounds and tiny icons
+            if img and 50 < w < 400 and 50 < h < 400:
+                # Use actual pixel dimensions if it's a PIL Image, else use box coords
+                if hasattr(img, 'size'):
+                    px_area = img.size[0] * img.size[1]
+                else:
+                    px_area = w * h
+                avatar_candidates.append((px_area, img))
+
+        # Method 2: Fallback — extract embedded images directly from the PDF
+        if not avatar_candidates:
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(BytesIO(binary))
+                for page_idx in range(min(3, len(reader.pages))):
+                    page = reader.pages[page_idx]
+                    for image_obj in page.images:
+                        try:
+                            img = Image.open(BytesIO(image_obj.data))
+                            w, h = img.size
+                            # Avatar: small-to-medium, roughly proportional
+                            if 80 < w < 1000 and 80 < h < 1000 and 0.3 < w / h < 3.0:
+                                avatar_candidates.append((w * h, img))
+                        except Exception:
+                            continue
+            except Exception as e:
+                logging.warning(f"PyPDF image extraction fallback failed: {e}")
+
+        # Pick the largest candidate — a real photo is always bigger than icon sprites
+        if avatar_candidates:
+            avatar_candidates.sort(key=lambda x: x[0], reverse=True)
+            doc["image"] = avatar_candidates[0][1]
 
         # Format a summary section from education, work, projects, etc.
         summary_parts = []

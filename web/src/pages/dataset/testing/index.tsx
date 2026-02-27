@@ -21,7 +21,7 @@ export default function RetrievalTesting() {
   const [count] = useState(1);
 
   return (
-    <div className="p-5">
+    <div className="px-10 py-6">
       <section className="flex justify-between items-center">
         <TopTitle
           title={t('knowledgeDetails.retrievalTesting')}

@@ -1,17 +1,12 @@
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card';
 import { DocumentType } from '@/constants/knowledge';
 import { useRemoveDocument } from '@/hooks/use-document-request';
 import { IDocumentInfo } from '@/interfaces/database/document';
 import { formatFileSize } from '@/utils/common-util';
 import { formatDate } from '@/utils/date';
 import { downloadDocument } from '@/utils/file-util';
-import { BrainCircuit, Download, Eye, PenLine, Trash2 } from 'lucide-react';
+import { BrainCircuit, Download, PenLine, Trash2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { UseRenameDocumentShowType } from './use-rename-document';
 import { isParserRunning } from './utils';
@@ -66,7 +61,7 @@ export function DatasetActionCell({
       </Button>
       <Button
         variant="transparent"
-        className="border-none hover:bg-bg-card text-blue-600"
+        className="border-none hover:bg-bg-card text-primary"
         size={'sm'}
         disabled={isRunning}
         onClick={() => showManageMetadataModal(record)}
@@ -74,7 +69,7 @@ export function DatasetActionCell({
       >
         <BrainCircuit className="w-4 h-4" />
       </Button>
-      <HoverCard>
+      {/* <HoverCard>
         <HoverCardTrigger>
           <Button
             variant="transparent"
@@ -104,7 +99,7 @@ export function DatasetActionCell({
               })}
           </ul>
         </HoverCardContent>
-      </HoverCard>
+      </HoverCard> */}
 
       {isVirtualDocument || (
         <Button

@@ -43,9 +43,21 @@ from rag.nlp import rag_tokenizer
 from rag.prompts.generator import vision_llm_describe_prompt
 from common import settings
 
-LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
-if LOCK_KEY_pdfplumber not in sys.modules:
-    sys.modules[LOCK_KEY_pdfplumber] = threading.Lock()
+# Per-file pdfplumber lock registry (Fix #3).
+# pdfplumber is not fully thread-safe when operating on the *same* file
+# simultaneously, but there is no need to serialise across *different* files.
+# A tiny global mutex guards the registry dict; individual per-file locks are
+# used for the actual pdfplumber.open() calls.
+_pdfplumber_registry_lock = threading.Lock()
+_pdfplumber_file_locks = {}
+
+
+def _get_pdfplumber_lock(key: str):
+    """Return a per-file Lock for the given path/key."""
+    with _pdfplumber_registry_lock:
+        if key not in _pdfplumber_file_locks:
+            _pdfplumber_file_locks[key] = threading.Lock()
+        return _pdfplumber_file_locks[key]
 
 
 class RAGFlowPdfParser:
@@ -84,23 +96,38 @@ class RAGFlowPdfParser:
             self.layouter = LayoutRecognizer(recognizer_domain)
         self.tbl_det = TableStructureRecognizer()
 
-        self.updown_cnt_mdl = xgb.Booster()
-        try:
-            pip_install_torch()
-            import torch.cuda
-            if torch.cuda.is_available():
-                self.updown_cnt_mdl.set_param({"device": "cuda"})
-        except Exception:
-            logging.info("No torch found.")
-        try:
-            model_dir = os.path.join(get_project_base_directory(), "rag/res/deepdoc")
-            self.updown_cnt_mdl.load_model(os.path.join(model_dir, "updown_concat_xgb.model"))
-        except Exception:
-            model_dir = snapshot_download(repo_id="InfiniFlow/text_concat_xgb_v1.0", local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"), local_dir_use_symlinks=False)
-            self.updown_cnt_mdl.load_model(os.path.join(model_dir, "updown_concat_xgb.model"))
+        # Fix #4: XGBoost model is only used when ENABLE_CONCAT_DOWNWARD=1.
+        # Defer loading to the lazy property below to avoid dead-weight at startup.
+        self._updown_cnt_mdl: xgb.Booster | None = None
 
         self.page_from = 0
         self.column_num = 1
+
+    @property
+    def updown_cnt_mdl(self):
+        """Lazy-load the XGBoost paragraph-merge model on first access."""
+        if self._updown_cnt_mdl is None:
+            logging.debug("Loading updown_concat XGBoost model (lazy).")
+            mdl = xgb.Booster()
+            try:
+                pip_install_torch()
+                import torch.cuda
+                if torch.cuda.is_available():
+                    mdl.set_param({"device": "cuda"})
+            except Exception:
+                logging.info("No torch found; using CPU for XGBoost.")
+            try:
+                model_dir = os.path.join(get_project_base_directory(), "rag/res/deepdoc")
+                mdl.load_model(os.path.join(model_dir, "updown_concat_xgb.model"))
+            except Exception:
+                model_dir = snapshot_download(
+                    repo_id="InfiniFlow/text_concat_xgb_v1.0",
+                    local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
+                    local_dir_use_symlinks=False,
+                )
+                mdl.load_model(os.path.join(model_dir, "updown_concat_xgb.model"))
+            self._updown_cnt_mdl = mdl
+        return self._updown_cnt_mdl
 
     def __char_width(self, c):
         return (c["x1"] - c["x0"]) // max(len(c["text"]), 1)
@@ -116,14 +143,22 @@ class RAGFlowPdfParser:
 
     def _match_proj(self, b):
         proj_patt = [
-            r"第[零一二三四五六七八九十百]+章",
-            r"第[零一二三四五六七八九十百]+[条节]",
-            r"[零一二三四五六七八九十百]+[、是 　]",
-            r"[\(（][零一二三四五六七八九十百]+[）\)]",
-            r"[\(（][0-9]+[）\)]",
-            r"[0-9]+(、|\.[　 ]|）|\.[^0-9./a-zA-Z_%><-]{4,})",
-            r"[0-9]+\.[0-9.]+(、|\.[ 　])",
-            r"[⚫•➢①② ]",
+            # English chapter/section headings (e.g., "Chapter 1", "Section 2", "Article 3")
+            r"(?i)(chapter|section|article|part)\s+[0-9IVXivx]+",
+            # Vietnamese chapter/section headings (e.g., "Chương 1", "Điều 2", "Mục 3", "Phần 4")
+            r"(?i)(ch\u01b0\u01a1ng|\u0111i\u1ec1u|m\u1ee5c|ph\u1ea7n)\s+[0-9IVXivx]+",
+            # Roman numeral list items (e.g., "I.", "II.", "III.")
+            r"(?i)[IVXLCDM]+\.\s",
+            # Lettered list items (e.g., "a.", "b.", "A.")
+            r"[a-zA-Z]\.\s",
+            # Arabic numeral in parentheses (e.g., (1), (2))
+            r"[\(][0-9]+[\)]",
+            # Numbered list items (e.g., "1.", "1) ")
+            r"[0-9]+(\.[ \t]|\)\s)",
+            # Multi-level numbering (e.g., "1.1.", "1.2. ")
+            r"[0-9]+\.[0-9.]+\.?\s",
+            # Bullet point symbols
+            r"[⚫•➢①②▪▸–\-]\s"
         ]
         return any([re.match(p, b["text"]) for p in proj_patt])
 
@@ -279,6 +314,13 @@ class RAGFlowPdfParser:
                 b["SP"] = ii
 
     def __ocr(self, pagenum, img, chars, ZM=3, device_id: int | None = None):
+        # Fix #6 – Thread-safety note:
+        # self.boxes is grown by .append() inside this method.
+        # In the parallel-GPU path (parallel_limiter), each call runs inside
+        # asyncio.to_thread() but writes are serialised per-page because each
+        # concurrent task appends exactly one element (the OCR result for its
+        # page). Python's list.append() is GIL-protected and therefore atomic.
+        # No additional locking is required as long as this invariant holds.
         start = timer()
         bxs = self.ocr.detect(np.array(img), device_id)
         logging.info(f"__ocr detecting boxes of a image cost ({timer() - start}s)")
@@ -578,7 +620,11 @@ class RAGFlowPdfParser:
 
     def _concat_downward(self, concat_between_pages=True):
         self.boxes = Recognizer.sort_Y_firstly(self.boxes, 0)
-        return
+        # Fix #1: The XGBoost-based inter-paragraph merge was accidentally disabled
+        # by an early `return`. It is now opt-in via the env variable
+        # ENABLE_CONCAT_DOWNWARD=1 so it can be validated safely before broad roll-out.
+        if os.getenv("ENABLE_CONCAT_DOWNWARD", "").lower() not in ("1", "true"):
+            return
 
         # count boxes in the same row as a feature
         for i in range(len(self.boxes)):
@@ -686,7 +732,12 @@ class RAGFlowPdfParser:
         findit = False
         i = 0
         while i < len(self.boxes):
-            if not re.match(r"(contents|目录|目次|table of contents|致谢|acknowledge)$", re.sub(r"( | |\u3000)+", "", self.boxes[i]["text"].lower())):
+            # Fix #5: Extended TOC regex to cover Vietnamese, French, German and Spanish.
+            if not re.match(
+                r"(contents|目录|目次|table of contents|致谢|acknowledge"
+                r"|mục lục|nội dung|sommaire|remerciements|inhaltsverzeichnis|indice)$",
+                re.sub(r"( |\xa0|\u3000)+", "", self.boxes[i]["text"].lower()),
+            ):
                 i += 1
                 continue
             findit = True
@@ -1029,7 +1080,8 @@ class RAGFlowPdfParser:
     @staticmethod
     def total_page_number(fnm, binary=None):
         try:
-            with sys.modules[LOCK_KEY_pdfplumber]:
+            _lock_key = fnm if isinstance(fnm, str) else "<binary>"
+            with _get_pdfplumber_lock(_lock_key):
                 pdf = pdfplumber.open(fnm) if not binary else pdfplumber.open(BytesIO(binary))
             total_page = len(pdf.pages)
             pdf.close()
@@ -1048,7 +1100,8 @@ class RAGFlowPdfParser:
         self.page_from = page_from
         start = timer()
         try:
-            with sys.modules[LOCK_KEY_pdfplumber]:
+            _lock_key = fnm if isinstance(fnm, str) else "<binary>"
+            with _get_pdfplumber_lock(_lock_key):
                 with pdfplumber.open(fnm) if isinstance(fnm, str) else pdfplumber.open(BytesIO(fnm)) as pdf:
                     self.pdf = pdf
                     self.page_images = [p.to_image(resolution=72 * zoomin, antialias=True).annotated for i, p in enumerate(self.pdf.pages[page_from:page_to])]
@@ -1109,11 +1162,28 @@ class RAGFlowPdfParser:
                     chars[j]["text"] += " "
                 j += 1
 
-            if limiter:
-                async with limiter:
-                    await asyncio.to_thread(self.__ocr, i + 1, img, chars, zoomin, id)
-            else:
-                self.__ocr(i + 1, img, chars, zoomin, id)
+            # Fix #7: Retry OCR up to MAX_OCR_RETRIES times with exponential backoff.
+            _MAX_OCR_RETRIES = 2
+            for _attempt in range(_MAX_OCR_RETRIES + 1):
+                try:
+                    if limiter:
+                        async with limiter:
+                            await asyncio.to_thread(self.__ocr, i + 1, img, chars, zoomin, id)
+                    else:
+                        self.__ocr(i + 1, img, chars, zoomin, id)
+                    break  # success — exit retry loop
+                except Exception as _ocr_err:
+                    if _attempt == _MAX_OCR_RETRIES:
+                        logging.error(
+                            f"OCR failed for page {i + 1} after {_MAX_OCR_RETRIES} retries: {_ocr_err}"
+                        )
+                    else:
+                        _delay = 0.5 * (2 ** _attempt)
+                        logging.warning(
+                            f"OCR page {i + 1} attempt {_attempt + 1} failed, "
+                            f"retrying in {_delay:.1f}s: {_ocr_err}"
+                        )
+                        await asyncio.sleep(_delay)
 
             if callback and i % 6 == 5:
                 callback((i + 1) * 0.6 / len(self.page_images))
@@ -1162,7 +1232,21 @@ class RAGFlowPdfParser:
 
         start = timer()
 
-        asyncio.run(__img_ocr_launcher())
+        # Fix #2: asyncio.run() raises RuntimeError when an event loop is already
+        # running (e.g. inside FastAPI / uvicorn or a Jupyter notebook).
+        # If a loop is already running we delegate to a background thread so that
+        # asyncio.run() creates its own isolated loop there.
+        try:
+            _running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            _running_loop = None
+
+        if _running_loop and _running_loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
+                _pool.submit(asyncio.run, __img_ocr_launcher()).result()
+        else:
+            asyncio.run(__img_ocr_launcher())
 
         logging.info(f"__images__ {len(self.page_images)} pages cost {timer() - start}s")
 
@@ -1450,7 +1534,8 @@ class VisionParser(RAGFlowPdfParser):
 
     def __images__(self, fnm, zoomin=3, page_from=0, page_to=299, callback=None):
         try:
-            with sys.modules[LOCK_KEY_pdfplumber]:
+            _lock_key = fnm if isinstance(fnm, str) else "<binary>"
+            with _get_pdfplumber_lock(_lock_key):
                 self.pdf = pdfplumber.open(fnm) if isinstance(fnm, str) else pdfplumber.open(BytesIO(fnm))
                 self.page_images = [p.to_image(resolution=72 * zoomin).annotated for i, p in enumerate(self.pdf.pages[page_from:page_to])]
                 self.total_page = len(self.pdf.pages)

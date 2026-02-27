@@ -72,8 +72,8 @@ function Root({ children }: React.PropsWithChildren) {
         theme={{
           token: {
             fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-            colorPrimary: '#27D3FF',
-            colorInfo: '#27D3FF',
+            colorPrimary: '#0D9394',
+            colorInfo: '#0D9394',
             colorBgBase: themeragflow === 'dark' ? '#071427' : '#FFFFFF',
             colorBgContainer: themeragflow === 'dark' ? '#0E1E36' : '#F5F5F5',
             colorBgLayout: themeragflow === 'dark' ? '#0B1F3B' : '#F0F0F0',

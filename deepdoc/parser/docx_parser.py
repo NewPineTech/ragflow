@@ -14,20 +14,34 @@
 #  limitations under the License.
 #
 
-from docx import Document
+import logging  # Fix #6: add missing logging import
 import re
-import pandas as pd
 from collections import Counter
-from rag.nlp import rag_tokenizer
 from io import BytesIO
+
+import pandas as pd
+from docx import Document
+
+from rag.nlp import rag_tokenizer
 
 
 class RAGFlowDocxParser:
 
+    # Fix #1: replace magic 100000000 with a named sentinel
+    _MAX_PAGE = 10_000_000
+
     def __extract_table_content(self, tb):
         df = []
         for row in tb.rows:
-            df.append([c.text for c in row.cells])
+            # Fix #5: python-docx repeats the same cell object for merged cells;
+            # deduplicate by object identity to avoid duplicate column values.
+            seen = set()
+            cells = []
+            for c in row.cells:
+                if id(c) not in seen:
+                    seen.add(id(c))
+                    cells.append(c.text)
+            df.append(cells)
         return self.__compose_table_content(pd.DataFrame(df))
 
     def __compose_table_content(self, df):
@@ -62,8 +76,11 @@ class RAGFlowDocxParser:
 
             return "Ot"
 
+        # Fix #4: log visibly instead of silently returning when table is too small
         if len(df) < 2:
+            logging.debug("Table has fewer than 2 rows; skipping content composition.")
             return []
+
         max_type = Counter([blockType(str(df.iloc[i, j])) for i in range(
             1, len(df)) for j in range(len(df.iloc[i, :]))])
         max_type = max(max_type.items(), key=lambda x: x[1])[0]
@@ -113,27 +130,45 @@ class RAGFlowDocxParser:
             return lines
         return ["\n".join(lines)]
 
-    def __call__(self, fnm, from_page=0, to_page=100000000):
-        self.doc = Document(fnm) if isinstance(
-            fnm, str) else Document(BytesIO(fnm))
-        pn = 0 # parsed page
-        secs = [] # parsed contents
+    def __call__(self, fnm, from_page=0, to_page=None):
+        # Fix #1: use named sentinel instead of magic number
+        to_page = self._MAX_PAGE if to_page is None else to_page
+
+        self.doc = Document(fnm) if isinstance(fnm, str) else Document(BytesIO(fnm))
+        pn = 0  # current page index (0-based)
+        secs = []  # parsed (text, style) pairs
+
         for p in self.doc.paragraphs:
             if pn > to_page:
                 break
 
-            runs_within_single_paragraph = [] # save runs within the range of pages
+            runs_within_single_paragraph = []
             for run in p.runs:
-                if pn > to_page:
-                    break
-                if from_page <= pn < to_page and p.text.strip():
-                    runs_within_single_paragraph.append(run.text) # append run.text first
-
-                # wrap page break checker into a static method
+                # Fix #1 (Bug A): increment page counter BEFORE the range check
+                # so pn reflects the correct page when we decide to include text.
                 if 'lastRenderedPageBreak' in run._element.xml:
                     pn += 1
 
-            secs.append(("".join(runs_within_single_paragraph), p.style.name if hasattr(p.style, 'name') else '')) # then concat run.text as part of the paragraph
+                if from_page <= pn <= to_page and p.text.strip():
+                    runs_within_single_paragraph.append(run.text)
 
-        tbls = [self.__extract_table_content(tb) for tb in self.doc.tables]
+            # Fix #2: if runs produced no text but p.text has content
+            # (e.g. field-only paragraphs, inline images with alt-text),
+            # fall back to p.text so content is not silently lost.
+            text = "".join(runs_within_single_paragraph)
+            if not text and p.text.strip() and from_page <= pn <= to_page:
+                text = p.text
+
+            style = p.style.name if hasattr(p.style, 'name') else ''
+            secs.append((text, style))
+
+        # Fix #3: catch per-table errors so one bad table doesn't abort the parse
+        tbls = []
+        for tb in self.doc.tables:
+            try:
+                tbls.append(self.__extract_table_content(tb))
+            except Exception as e:
+                logging.warning(f"Skipping malformed table: {e}")
+                tbls.append([])
+
         return secs, tbls
