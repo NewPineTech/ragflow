@@ -139,7 +139,7 @@ def _execute_single_retrieval(
             raise e
         elif e.resp.status == 404 or e.resp.status == 403:
             if continue_on_404_or_403:
-                logging.debug(f"Error executing request: {e}")
+                logging.warning(f"Suppressed {e.resp.status} error during retrieval (continuing as requested): {e}")
                 results = {}
             else:
                 raise e

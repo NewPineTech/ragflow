@@ -606,8 +606,8 @@ class InfinityConnection(DocStoreConnection):
                         d[k] = "###".join(v)
                     else:
                         d[k] = v
-                elif re.search(r"_feas$", k):
-                    d[k] = json.dumps(v)
+                elif re.search(r"(_feas|_obj)$", k):
+                    d[k] = json.dumps(v, ensure_ascii=False)
                 elif k == "kb_id":
                     if isinstance(d[k], list):
                         d[k] = d[k][0]  # since d[k] is a list, but we need a str
@@ -821,7 +821,7 @@ class InfinityConnection(DocStoreConnection):
             k = column.lower()
             if field_keyword(k):
                 res2[column] = res2[column].apply(lambda v: [kwd for kwd in v.split("###") if kwd])
-            elif re.search(r"_feas$", k):
+            elif re.search(r"(_feas|_obj)$", k):
                 res2[column] = res2[column].apply(lambda v: json.loads(v) if v else {})
             elif k == "position_int":
                 def to_position_int(v):

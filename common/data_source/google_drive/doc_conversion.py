@@ -15,6 +15,7 @@ from common.data_source.google_drive.constant import DRIVE_FOLDER_TYPE, DRIVE_SH
 from common.data_source.google_drive.model import GDriveMimeType, GoogleDriveFileType
 from common.data_source.google_drive.section_extraction import HEADING_DELIMITER
 from common.data_source.google_util.resource import GoogleDriveService, get_drive_service
+from common.data_source.google_util.util import GoogleFields, execute_paginated_retrieval, get_file_owners
 from common.data_source.models import ConnectorFailure, Document, DocumentFailure, ImageSection, SlimDocument, TextSection
 from common.data_source.utils import get_file_ext
 
@@ -483,6 +484,7 @@ def _convert_drive_item_to_document(
             extension=extension,
             size_bytes=len(blob),
             doc_updated_at=doc_updated_at,
+            primary_owners=get_file_owners(file, retriever_email),
         )
     except Exception as e:
         doc_id = "unknown"

@@ -827,6 +827,43 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
         res["audio_binary"] = tts(tts_mdl, answer)
         yield res
 
+async def generate_suggested_questions(chat_mdl, questions, answer):
+    try:
+        from rag.prompts.template import load_prompt
+        prompt = load_prompt("suggest_questions")
+        
+        # Combine questions if there are multiple
+        user_question = " ".join(questions)
+        
+        # Clean the answer out of think tags if they exist
+        clean_answer = re.sub(r"^.*</think>", "", answer, flags=re.DOTALL).strip()
+        
+        msg = [
+            {"role": "user", "content": f"**User question:** {user_question}\n\n**Answer:** {clean_answer}"}
+        ]
+        
+        # Generate with a slightly higher temperature for variety, but standard settings
+        gen_conf = {"temperature": 0.5, "max_tokens": 150}
+        
+        # This could be called from sync or async context depending on caller
+        ans = await chat_mdl.async_chat(prompt, msg, gen_conf)
+        
+        # Parse the numbered list output
+        suggestions = []
+        for line in ans.split('\n'):
+            line = line.strip()
+            # Match numbered list items (1. 2. 3.)
+            if re.match(r"^\d+\.\s+", line):
+                # Remove the number prefix
+                suggestion = re.sub(r"^\d+\.\s+", "", line).strip()
+                if suggestion:
+                    suggestions.append(suggestion)
+                
+        return suggestions[:3] # Ensure max 3
+    except Exception as e:
+        logging.error(f"[CHATV1] Error generating suggested questions: {e}")
+        return []
+
 async def chatv1(dialog, messages, stream=True, **kwargs):
     """
     Optimized chat function with intelligent streaming (V1)
@@ -1290,12 +1327,21 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
         #if prompt_config.get("remove_markdown"):
         #    answer = remove_markdown(answer)
 
+        suggested_questions = []
+        try:
+            suggested_questions = chat_mdl._run_coroutine_sync(
+                generate_suggested_questions(chat_mdl, questions, answer)
+            )
+        except Exception as e:
+            logging.error(f"[CHATV1] Sync generation of suggested questions failed: {e}")
+
         return {
             "answer": think + answer, 
             "reference": refs, 
             "prompt": re.sub(r"\n", "  \n", prompt), 
             "created_at": time.time(),
-            "memory": memory_text if memory_text else None
+            "memory": memory_text if memory_text else None,
+            "suggested_questions": suggested_questions
         }
 
     if langfuse_tracer:

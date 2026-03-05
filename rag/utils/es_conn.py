@@ -498,7 +498,7 @@ class ESConnection(DocStoreConnection):
                 if n == "available_int" and isinstance(v, (int, float)):
                     m[n] = v
                     continue
-                if not isinstance(v, str):
+                if not isinstance(v, (str, dict, list)):
                     m[n] = str(m[n])
                 # if n.find("tks") > 0:
                 #     m[n] = remove_redundant_spaces(m[n])

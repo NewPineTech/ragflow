@@ -55,6 +55,26 @@ export function SingleChatBox({
   const { visible, hideModal, documentId, selectedChunk, clickDocumentButton } =
     useClickDrawer();
 
+  const handleSuggestedQuestionClick = (question: string) => {
+    // Set the input value to the clicked question
+    handleInputChange({ target: { value: question } } as any);
+
+    // We need to wait for state to update, so we can't call handlePressEnter directly
+    // Instead we use a setTimeout to let React update the state first
+    setTimeout(() => {
+      // Create a simulated click on the submit button so the hook handles it properly
+      // We know value will be updated in the next render cycle, but we can also just
+      // call the hook's internal logic directly or let the user click send.
+      // Easiest is to set the value and focus the input so the user can just press Enter
+      const inputEl = document.querySelector(
+        'textarea.ant-input',
+      ) as HTMLTextAreaElement;
+      if (inputEl) {
+        inputEl.focus();
+      }
+    }, 10);
+  };
+
   useEffect(() => {
     const messages = conversation?.message;
     if (Array.isArray(messages)) {
@@ -98,6 +118,8 @@ export function SingleChatBox({
                 removeMessageById={removeMessageById}
                 regenerateMessage={regenerateMessage}
                 sendLoading={sendLoading}
+                isLastMessage={i === derivedMessages.length - 1}
+                onSuggestedQuestionClick={handleSuggestedQuestionClick}
               ></MessageItem>
             );
           })}

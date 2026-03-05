@@ -217,8 +217,9 @@ OAUTH_GOOGLE_DRIVE_CLIENT_ID = os.environ.get("OAUTH_GOOGLE_DRIVE_CLIENT_ID", ""
 OAUTH_GOOGLE_DRIVE_CLIENT_SECRET = os.environ.get(
     "OAUTH_GOOGLE_DRIVE_CLIENT_SECRET", ""
 )
-GOOGLE_DRIVE_WEB_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_DRIVE_WEB_OAUTH_REDIRECT_URI", "http://localhost:9380/v1/connector/google-drive/oauth/web/callback")
-GMAIL_WEB_OAUTH_REDIRECT_URI = os.environ.get("GMAIL_WEB_OAUTH_REDIRECT_URI", "http://localhost:9380/v1/connector/gmail/oauth/web/callback")
+RAGFLOW_SERVER_BASE_URL = os.environ.get("RAGFLOW_SERVER_BASE_URL", "http://localhost:9380")
+GOOGLE_DRIVE_WEB_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_DRIVE_WEB_OAUTH_REDIRECT_URI", f"{RAGFLOW_SERVER_BASE_URL}/v1/connector/google-drive/oauth/web/callback")
+GMAIL_WEB_OAUTH_REDIRECT_URI = os.environ.get("GMAIL_WEB_OAUTH_REDIRECT_URI", f"{RAGFLOW_SERVER_BASE_URL}/v1/connector/gmail/oauth/web/callback")
 
 CONFLUENCE_OAUTH_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
 RATE_LIMIT_MESSAGE_LOWERCASE = "Rate limit exceeded".lower()
@@ -228,7 +229,7 @@ _DEFAULT_PAGINATION_LIMIT = 1000
 _PROBLEMATIC_EXPANSIONS = "body.storage.value"
 _REPLACEMENT_EXPANSIONS = "body.view.value"
 
-BOX_WEB_OAUTH_REDIRECT_URI = os.environ.get("BOX_WEB_OAUTH_REDIRECT_URI", "http://localhost:9380/v1/connector/box/oauth/web/callback")
+BOX_WEB_OAUTH_REDIRECT_URI = os.environ.get("BOX_WEB_OAUTH_REDIRECT_URI", f"{RAGFLOW_SERVER_BASE_URL}/v1/connector/box/oauth/web/callback")
 
 class HtmlBasedConnectorTransformLinksStrategy(str, Enum):
     # remove links entirely

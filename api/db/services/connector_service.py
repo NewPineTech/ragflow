@@ -74,6 +74,7 @@ class ConnectorService(CommonService):
             return None
         SyncLogsService.filter_delete([SyncLogs.connector_id==connector_id, SyncLogs.kb_id==kb_id])
         docs = DocumentService.query(source_type=f"{conn.source}/{conn.id}", kb_id=kb_id)
+        logging.info(f"Rebuild for connector {connector_id} on KB {kb_id}. Deleting {len(docs)} documents.")
         err = FileService.delete_docs([d.id for d in docs], tenant_id)
         SyncLogsService.schedule(connector_id, kb_id, reindex=True)
         return err
@@ -127,7 +128,7 @@ class SyncLogsService(CommonService):
                 Connector.input_type == InputType.POLL,
                 Connector.status == TaskStatus.SCHEDULE,
                 cls.model.status == TaskStatus.SCHEDULE,
-                cls.model.update_date < (fn.NOW() - interval_expr)
+                (cls.model.update_date < (fn.NOW() - interval_expr)) | (cls.model.from_beginning == "1")
             )
 
         query = query.distinct().order_by(cls.model.update_time.desc())

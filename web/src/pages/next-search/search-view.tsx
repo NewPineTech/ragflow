@@ -213,57 +213,88 @@ export default function SearchingView({
                   {chunks.map((chunk, index) => {
                     return (
                       <div key={index}>
-                        <div className="w-full flex flex-col">
-                          <div className="w-full highlightContent">
-                            <ImageWithPopover
-                              id={chunk.image_id || chunk.img_id}
-                            ></ImageWithPopover>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <div
-                                  dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(
-                                      `${
-                                        chunk.highlight ??
-                                        chunk.content_with_weight ??
-                                        ''
-                                      }...`,
-                                    ),
-                                  }}
-                                  className="text-sm text-text-primary mb-1"
-                                ></div>
-                              </PopoverTrigger>
-                              <PopoverContent className="text-text-primary !w-full max-w-lg ">
-                                <div className="max-h-96 overflow-auto scrollbar-thin">
-                                  <HighLightMarkdown>
-                                    {chunk.content_with_weight}
-                                  </HighLightMarkdown>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
+                        <div className="w-full flex flex-col gap-2">
+                          <div
+                            className="flex gap-2 items-center text-sm font-bold text-primary cursor-pointer hover:underline"
+                            onClick={() =>
+                              clickDocumentButton(chunk.doc_id, chunk as any)
+                            }
+                          >
+                            <FileIcon name={chunk.docnm_kwd}></FileIcon>
+                            {chunk.docnm_kwd}
                           </div>
-                          <div className="flex gap-2 items-center mt-3">
+
+                          {chunk.cv_metadata_obj?.summary ||
+                          (chunk as any).metadata?.summary ? (
+                            <div className="w-full flex gap-3 items-start">
+                              {(chunk.image_id || chunk.img_id) && (
+                                <div className="flex-shrink-0">
+                                  <ImageWithPopover
+                                    id={chunk.image_id || chunk.img_id}
+                                  ></ImageWithPopover>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <div className="text-sm text-text-secondary border-l-4 border-primary/40 pl-3 py-1 bg-primary/5 rounded-r-md italic mb-1 cursor-pointer hover:bg-primary/10 transition-colors">
+                                      {chunk.cv_metadata_obj?.summary ||
+                                        (chunk as any).metadata?.summary}
+                                    </div>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="text-text-primary !w-full max-w-lg ">
+                                    <div className="max-h-96 overflow-auto scrollbar-thin">
+                                      <HighLightMarkdown>
+                                        {chunk.content_with_weight}
+                                      </HighLightMarkdown>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-full highlightContent">
+                              <ImageWithPopover
+                                id={chunk.image_id || chunk.img_id}
+                              ></ImageWithPopover>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <div
+                                    dangerouslySetInnerHTML={{
+                                      __html: DOMPurify.sanitize(
+                                        `${
+                                          chunk.content_with_weight ??
+                                          chunk.highlight ??
+                                          ''
+                                        }...`,
+                                      ),
+                                    }}
+                                    className="text-sm text-text-primary mb-1 cursor-pointer"
+                                  ></div>
+                                </PopoverTrigger>
+                                <PopoverContent className="text-text-primary !w-full max-w-lg ">
+                                  <div className="max-h-96 overflow-auto scrollbar-thin">
+                                    <HighLightMarkdown>
+                                      {chunk.content_with_weight}
+                                    </HighLightMarkdown>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          )}
+
+                          {chunk.cv_metadata_obj && (
                             <div
-                              className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit cursor-pointer hover:bg-bg-accent"
+                              className="flex gap-2 items-center text-[10px] text-primary/70 border border-primary/10 bg-primary/5 px-2 py-0.5 rounded-full w-fit cursor-pointer hover:bg-primary/10 transition-colors"
                               onClick={() =>
-                                clickDocumentButton(chunk.doc_id, chunk as any)
+                                handleShowMetadata(chunk.cv_metadata_obj)
                               }
                             >
-                              <FileIcon name={chunk.docnm_kwd}></FileIcon>
-                              {chunk.docnm_kwd}
+                              <BrainCircuit className="w-3 h-3" />
+                              {t('knowledgeDetails.metadata.metadata') ||
+                                'Metadata'}
                             </div>
-                            {chunk.cv_metadata_obj && (
-                              <div
-                                className="flex gap-2 items-center text-xs text-primary border border-primary/20 bg-primary/5 p-1 rounded-lg w-fit cursor-pointer hover:bg-primary/10"
-                                onClick={() =>
-                                  handleShowMetadata(chunk.cv_metadata_obj)
-                                }
-                              >
-                                <BrainCircuit className="w-3 h-3" />
-                                {t('knowledgeDetails.metadata') || 'Metadata'}
-                              </div>
-                            )}
-                          </div>
+                          )}
                         </div>
                         {index < chunks.length - 1 && (
                           <div className="w-full border-b border-border-default/80 mt-6"></div>
@@ -370,7 +401,7 @@ export default function SearchingView({
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {t('knowledgeDetails.metadata') || 'Extraction Metadata'}
+              {t('knowledgeDetails.metadata.metadata') || 'Extraction Metadata'}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto p-4 bg-bg-card rounded-lg border border-border-button">

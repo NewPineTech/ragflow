@@ -636,7 +636,8 @@ class Dealer:
                 "term_similarity": sim,
                 "vector": [0.0] * vector_size,
                 "positions": chunk.get("position_int", []),
-                "doc_type_kwd": chunk.get("doc_type_kwd", "")
+                "doc_type_kwd": chunk.get("doc_type_kwd", ""),
+                "cv_metadata_obj": chunk.get("cv_metadata_obj", {})
             }
             for k in chunk.keys():
                 if k[-4:] == "_vec":
@@ -684,7 +685,8 @@ class Dealer:
                 "term_similarity": np.mean([ck["similarity"] for ck in cks]),
                 "vector": [0.0] * vector_size,
                 "positions": chunk.get("position_int", []),
-                "doc_type_kwd": chunk.get("doc_type_kwd", "")
+                "doc_type_kwd": chunk.get("doc_type_kwd", ""),
+                "cv_metadata_obj": chunk.get("cv_metadata_obj", {})
             }
             for k in cks[0].keys():
                 if k[-4:] == "_vec":

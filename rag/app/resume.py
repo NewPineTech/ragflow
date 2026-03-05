@@ -17,6 +17,8 @@
 import logging
 import re
 import json
+import gc
+from datetime import datetime
 from io import BytesIO
 from PIL import Image
 from api.db.services.knowledgebase_service import KnowledgebaseService
@@ -30,6 +32,63 @@ from api.db.services.document_service import DocumentService
 forbidden_select_fields4resume = [
     "name_pinyin_kwd", "edu_first_fea_kwd", "degree_kwd", "sch_rank_kwd", "edu_fea_kwd"
 ]
+
+def normalize_date(date_str):
+    """Normalize various date formats to YYYY-MM-DD."""
+    if not date_str or not isinstance(date_str, str):
+        return date_str
+    
+    date_str = date_str.strip()
+    # Already normalized?
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+        return date_str
+    
+    # YYYY-MM
+    if re.match(r"^\d{4}-\d{2}$", date_str):
+        return f"{date_str}-01"
+    
+    # YYYY
+    if re.match(r"^\d{4}$", date_str):
+        return f"{date_str}-01-01"
+
+    # Human readable formats like "Dec 2023", "2023.12", "12/2023"
+    try:
+        from dateutil import parser
+        # Set default to Jan 1st of current year if missing
+        dt = parser.parse(date_str, default=datetime(datetime.now().year, 1, 1))
+        return dt.strftime("%Y-%m-%d")
+    except Exception:
+        # If any parsing fails, check if it's just a year
+        year_match = re.search(r"\b(19|20)\d{2}\b", date_str)
+        if year_match:
+            return f"{year_match.group(0)}-01-01"
+    
+    return date_str
+
+def clean_empty_values(data, normalize_dates=True):
+    """Recursively remove empty values and optionally normalize dates."""
+    date_fields = {"start", "end", "birth", "date"}
+    
+    if isinstance(data, dict):
+        cleaned = {}
+        for k, v in data.items():
+            if v is None or str(v).strip() == "" or str(v).lower() == "empty":
+                continue
+            
+            val = clean_empty_values(v, normalize_dates)
+            if val is not None:
+                if normalize_dates and k in date_fields and isinstance(val, str):
+                    val = normalize_date(val)
+                cleaned[k] = val
+        return cleaned if cleaned else None
+    elif isinstance(data, list):
+        cleaned = [
+            clean_empty_values(item, normalize_dates)
+            for item in data
+            if item is not None and str(item).strip() != "" and str(item).lower() != "empty"
+        ]
+        return [c for c in cleaned if c is not None]
+    return data
 
 def chunk(filename, binary=None, callback=None, **kwargs):
     """
@@ -46,8 +105,12 @@ def chunk(filename, binary=None, callback=None, **kwargs):
     
     # 1. Use RAGFlowPdfParser to get full text with OCR
     parser = RAGFlowPdfParser()
+    full_text = ""
+    avatar_image = None
+    all_boxes = []
+
     try:
-        def ocr_callback(prog, msg):
+        def ocr_callback(prog, msg=None):
             if callback:
                 # Scale OCR's 0.0-1.0 to 0.1-0.5 range in resume process
                 scaled_prog = 0.1 + (max(0, min(prog, 1.0)) * 0.4)
@@ -73,6 +136,179 @@ def chunk(filename, binary=None, callback=None, **kwargs):
             for box in sorted_boxes 
             if box.get("text", "").strip()
         ])
+
+        # Candidate Avatar Extraction: collect all candidates and pick the best one
+        # Moved up here so we can clear the heavy parser objects immediately after.
+        avatar_candidates = []  # list of (score, image)
+
+        def portrait_score(w, h, page=1):
+            """Score an image on how likely it is to be a portrait/headshot.
+            Returns a positive score (higher = more likely), or None to reject."""
+            if w == 0 or h == 0:
+                return None
+            aspect = w / h  # < 1 means taller than wide
+            # Must be roughly portrait-shaped — not a banner or wide chart
+            if aspect > 1.5 or aspect < 0.4:
+                return None
+            # Must be a reasonable size for a headshot (not a tiny icon)
+            if w < 60 or h < 60:
+                return None
+            # Reject very large images that are wider than they are tall  
+            # (catches landscape panoramas), but allow tall high-res portraits
+            if w > 4000 or h > 6000:
+                return None
+            # Score: prefer pages close to page 1, prefer portrait orientation (aspect<1)
+            page_penalty = (page - 1) * 500
+            # Portrait-ness bonus: images taller than wide score higher
+            portrait_bonus = max(0, (1.0 - aspect)) * 1000
+            # Use sqrt of area to reduce bias toward huge images vs. correct-size ones
+            import math
+            area_score = math.sqrt(w * h) * 10
+            return area_score + portrait_bonus - page_penalty
+
+        # Method 1: Look for figure-type boxes from page 1 only
+        figure_boxes = [b for b in all_boxes if b.get("layout_type") == "figure"]
+        for fig in figure_boxes:
+            page = fig.get("page_number", 1)
+            # Only consider the first 2 pages for avatars
+            if page > 2:
+                continue
+            w = fig.get("x1", 0) - fig.get("x0", 0)
+            h = fig.get("bottom", 0) - fig.get("top", 0)
+            img = fig.get("image")
+            if img is None:
+                continue
+            # Use actual pixel dimensions if available
+            if hasattr(img, 'size'):
+                pw, ph = img.size
+            else:
+                pw, ph = w, h
+            score = portrait_score(pw, ph, page)
+            if score is not None:
+                avatar_candidates.append((score, img))
+
+        # Method 2: Fallback — extract embedded images directly from the PDF
+        if not avatar_candidates:
+            try:
+                import cv2
+                import numpy as np
+                from pypdf import PdfReader
+                face_cascade = cv2.CascadeClassifier(
+                    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                )
+                reader = PdfReader(BytesIO(binary))
+                for page_idx in range(min(3, len(reader.pages))):
+                    page_obj = reader.pages[page_idx]
+                    page_w_px = float(page_obj.mediabox.width) * 150 / 72
+                    page_h_px = float(page_obj.mediabox.height) * 150 / 72
+                    for image_obj in page_obj.images:
+                        try:
+                            img = Image.open(BytesIO(image_obj.data))
+                            pw, ph = img.size
+                            # Skip large background panels (sidebars, headers, etc.)
+                            if pw / page_w_px >= 0.6 and ph / page_h_px >= 0.6:
+                                continue
+                            # Skip mostly-transparent RGBA overlays (decorative shapes)
+                            if img.mode == 'RGBA':
+                                alpha = np.array(img)[:, :, 3]
+                                if (alpha < 128).sum() / alpha.size > 0.5:
+                                    continue
+                            # Skip solid color blocks (very low color diversity)
+                            rgb = np.array(img.convert('RGB'))
+                            flat = rgb.reshape(-1, 3)
+                            sample = flat[::max(1, len(flat) // 500)]
+                            unique_colors = len(set(map(tuple, sample)))
+                            if unique_colors <= 5:
+                                logging.debug(f"Skipping solid block {pw}x{ph} ({unique_colors} colors)")
+                                continue
+                            # Base portrait score (aspect ratio, size, page)
+                            score = portrait_score(pw, ph, page_idx + 1)
+                            if score is None:
+                                continue
+                            # Face detection bonus: images with a face score MUCH higher
+                            # Require face to be ≥3% of image area to avoid false positives
+                            try:
+                                gray = cv2.cvtColor(
+                                    cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR),
+                                    cv2.COLOR_BGR2GRAY
+                                )
+                                faces = face_cascade.detectMultiScale(
+                                    gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+                                )
+                                img_area = pw * ph
+                                for (fx, fy, fw, fh) in faces:
+                                    face_pct = (fw * fh) / img_area
+                                    if face_pct >= 0.03:  # Face is ≥3% of image
+                                        score += 50000
+                                        break
+                            except Exception:
+                                pass
+                            avatar_candidates.append((score, img))
+                        except Exception:
+                            continue
+            except Exception as e:
+                logging.warning(f"PyPDF image extraction fallback failed: {e}")
+
+            # If some candidates have faces, only keep those
+            # If no candidate has a face, discard all — let Method 3 try instead
+            face_candidates = [(s, im) for s, im in avatar_candidates if s >= 50000]
+            if face_candidates:
+                avatar_candidates = face_candidates
+            else:
+                avatar_candidates = []
+
+        # Method 3: Face detection on rendered page (for scanned/rasterized CVs)
+        if not avatar_candidates and hasattr(parser, 'page_images') and parser.page_images:
+            try:
+                import cv2
+                import numpy as np
+                face_cascade = cv2.CascadeClassifier(
+                    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                )
+                # Only check the first page
+                page_img = parser.page_images[0]
+                if isinstance(page_img, Image.Image):
+                    cv_img = cv2.cvtColor(np.array(page_img), cv2.COLOR_RGB2BGR)
+                elif isinstance(page_img, np.ndarray):
+                    cv_img = page_img
+                else:
+                    cv_img = None
+
+                if cv_img is not None:
+                    gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+                    faces = face_cascade.detectMultiScale(
+                        gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)
+                    )
+                    if len(faces) > 0:
+                        # Pick the largest detected face
+                        faces_sorted = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+                        x, y, w, h = faces_sorted[0]
+                        # Add generous padding around the face for a natural portrait crop
+                        pad_x = int(w * 0.4)
+                        pad_y_top = int(h * 0.5)
+                        pad_y_bottom = int(h * 0.3)
+                        img_h, img_w = cv_img.shape[:2]
+                        x1 = max(0, x - pad_x)
+                        y1 = max(0, y - pad_y_top)
+                        x2 = min(img_w, x + w + pad_x)
+                        y2 = min(img_h, y + h + pad_y_bottom)
+                        cropped = cv_img[y1:y2, x1:x2]
+                        avatar_pil = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+                        avatar_candidates.append((10000, avatar_pil))
+                        logging.info(f"Face detected at ({x},{y},{w},{h}), cropped portrait {x2-x1}x{y2-y1}")
+            except Exception as e:
+                logging.warning(f"Face detection fallback failed: {e}")
+
+        # Pick the highest-scoring candidate (portrait-like, first page, right size)
+        if avatar_candidates:
+            avatar_candidates.sort(key=lambda x: x[0], reverse=True)
+            avatar_image = avatar_candidates[0][1]
+
+        # CLEAR HEAVY MEMORY
+        parser.page_images = []
+        parser.boxes = []
+        all_boxes = []
+        gc.collect()
         
     except Exception as e:
         callback(-1, f"OCR parsing failed: {str(e)}")
@@ -101,17 +337,19 @@ Required JSON Structure:
 - position: (Current or latest professional title)
 - summary: (A brief professional summary or profile statement)
 - education: [ 
-    {{"school": "...", "degree": "...", "major": "...", "gpa": "...", "start": "...", "end": "...", "description": "..."}}, ... 
+    {{"school": "...", "degree": "...", "major": "...", "gpa": "...", "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "description": "..."}}, ... 
   ]
 - work: [ 
-    {{"company": "...", "position": "...", "start": "...", "end": "...", "responsibilities": "Detailed list or paragraph of what they did", "achievements": ["...", "..."]}}, ... 
+    {{"company": "...", "position": "...", "start": "YYYY-MM-DD", "end": "YYYY-MM-DD", "responsibilities": "Detailed list or paragraph of what they did", "achievements": ["...", "..."]}}, ... 
   ]
 - projects: [
-    {{"name": "...", "role": "...", "technologies": ["...", "..."], "description": "...", "start": "...", "end": "..."}}, ...
+    {{"name": "...", "role": "...", "technologies": ["...", "..."], "description": "...", "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}, ...
   ]
 - skills: [ "Skill 1", "Skill 2", ... ]
-- certifications: [ {{"name": "...", "date": "...", "issuer": "..."}}, ... ]
+- certifications: [ {{"name": "...", "date": "YYYY-MM-DD", "issuer": "..."}}, ... ]
 - languages: [ {{"language": "...", "proficiency": "..."}}, ... ]
+
+IMPORTANT: All dates MUST be in YYYY-MM-DD format. If only month and year are available, use the first day of the month (e.g., 2023-12-01).
 
 Resume:
 ---
@@ -137,6 +375,9 @@ Resume:
             callback(0.65, f"LLM extraction failed (falling back): {str(e)}")
 
     callback(0.7, "Processing extracted data...")
+
+    # Sanitize structured data to remove empty strings that break Elasticsearch date fields
+    structured_data = clean_empty_values(structured_data)
 
     # 3. Construct the RAGFlow document
     # Map structured data to RAGFlow fields
@@ -184,47 +425,8 @@ Resume:
         if doc_id:
             DocumentService.update_meta_fields(doc_id, structured_data)
         
-        # Candidate Avatar Extraction: collect all candidates and pick the best one
-        avatar_candidates = []  # list of (pixel_area, image)
-
-        # Method 1: Look for figure-type boxes across all pages
-        figure_boxes = [b for b in all_boxes if b.get("layout_type") == "figure"]
-        for fig in figure_boxes:
-            w = fig.get("x1", 0) - fig.get("x0", 0)
-            h = fig.get("bottom", 0) - fig.get("top", 0)
-            img = fig.get("image")
-            # Filter: skip full-page backgrounds and tiny icons
-            if img and 50 < w < 400 and 50 < h < 400:
-                # Use actual pixel dimensions if it's a PIL Image, else use box coords
-                if hasattr(img, 'size'):
-                    px_area = img.size[0] * img.size[1]
-                else:
-                    px_area = w * h
-                avatar_candidates.append((px_area, img))
-
-        # Method 2: Fallback — extract embedded images directly from the PDF
-        if not avatar_candidates:
-            try:
-                from pypdf import PdfReader
-                reader = PdfReader(BytesIO(binary))
-                for page_idx in range(min(3, len(reader.pages))):
-                    page = reader.pages[page_idx]
-                    for image_obj in page.images:
-                        try:
-                            img = Image.open(BytesIO(image_obj.data))
-                            w, h = img.size
-                            # Avatar: small-to-medium, roughly proportional
-                            if 80 < w < 1000 and 80 < h < 1000 and 0.3 < w / h < 3.0:
-                                avatar_candidates.append((w * h, img))
-                        except Exception:
-                            continue
-            except Exception as e:
-                logging.warning(f"PyPDF image extraction fallback failed: {e}")
-
-        # Pick the largest candidate — a real photo is always bigger than icon sprites
-        if avatar_candidates:
-            avatar_candidates.sort(key=lambda x: x[0], reverse=True)
-            doc["image"] = avatar_candidates[0][1]
+        if avatar_image:
+            doc["image"] = avatar_image
 
         # Format a summary section from education, work, projects, etc.
         summary_parts = []

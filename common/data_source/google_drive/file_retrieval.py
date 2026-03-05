@@ -149,9 +149,9 @@ def crawl_folders_for_files(
             if isinstance(e, HttpError) and e.status_code == 403:
                 # don't yield an error here because this is expected behavior
                 # when a user doesn't have access to a folder
-                logging.debug(f"Error getting files in parent {parent_id}: {e}")
+                logging.warning(f"Access denied (403) for parent {parent_id}. Skipping files in this folder but continuing with subfolders if accessible. Error: {e}")
             else:
-                logging.error(f"Error getting files in parent {parent_id}: {e}")
+                logging.error(f"Unexpected error getting files in parent {parent_id}: {e}")
                 yield RetrievedDriveFile(
                     drive_file=file,
                     user_email=user_email,

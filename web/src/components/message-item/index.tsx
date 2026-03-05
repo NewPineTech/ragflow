@@ -23,6 +23,7 @@ import { RAGFlowAvatar } from '../ragflow-avatar';
 import { useTheme } from '../theme-provider';
 import { AssistantGroupButton, UserGroupButton } from './group-button';
 import styles from './index.less';
+import { SuggestedQuestions } from './suggested-questions';
 
 interface IProps extends Partial<IRemoveMessageById>, IRegenerateMessage {
   item: IMessage;
@@ -37,6 +38,8 @@ interface IProps extends Partial<IRemoveMessageById>, IRegenerateMessage {
   index: number;
   showLikeButton?: boolean;
   showLoudspeaker?: boolean;
+  onSuggestedQuestionClick?: (question: string) => void;
+  isLastMessage?: boolean;
 }
 
 const MessageItem = ({
@@ -53,6 +56,8 @@ const MessageItem = ({
   showLikeButton = true,
   showLoudspeaker = true,
   visibleAvatar = true,
+  onSuggestedQuestionClick,
+  isLastMessage = false,
 }: IProps) => {
   const { theme } = useTheme();
   const isAssistant = item.role === MessageType.Assistant;
@@ -180,6 +185,17 @@ const MessageItem = ({
                 <UploadedMessageFiles
                   files={uploadedFiles as UploadResponseDataType[]}
                 ></UploadedMessageFiles>
+              )}
+
+            {isAssistant &&
+              isLastMessage &&
+              item.suggested_questions &&
+              item.suggested_questions.length > 0 && (
+                <SuggestedQuestions
+                  questions={item.suggested_questions}
+                  onQuestionClick={onSuggestedQuestionClick || (() => {})}
+                  disabled={sendLoading}
+                />
               )}
           </section>
         </div>

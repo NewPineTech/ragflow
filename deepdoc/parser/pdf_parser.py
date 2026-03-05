@@ -1322,12 +1322,15 @@ class RAGFlowPdfParser:
                 dists = [
                     (min_rectangle_distance((pn, left, right, top + self.page_cum_height[pn], bott + self.page_cum_height[pn]), rect), i) for i, rect in bboxes for pn, left, right, top, bott in poss
                 ]
-                min_i = np.argmin(dists, axis=0)[0]
-                min_i, rect = bboxes[dists[min_i][-1]]
+                if not dists:
+                    min_i = len(self.boxes)
+                else:
+                    min_i = np.argmin(dists, axis=0)[0]
+                    min_i, rect = bboxes[dists[min_i][-1]]
                 if isinstance(txt, list):
                     txt = "\n".join(txt)
                 pn, left, right, top, bott = poss[0]
-                if self.boxes[min_i]["bottom"] < top + self.page_cum_height[pn]:
+                if min_i < len(self.boxes) and self.boxes[min_i]["bottom"] < top + self.page_cum_height[pn]:
                     min_i += 1
                 self.boxes.insert(
                     min_i,
