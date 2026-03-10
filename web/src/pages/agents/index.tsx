@@ -83,15 +83,46 @@ export default function Agents() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-10 w-full px-10 pt-8">
       {(!data?.length || data?.length <= 0) && !searchString ? (
-        <div className="flex w-full items-center justify-center py-20">
-          <EmptyAppCard
-            showIcon
-            size="large"
-            className="w-[480px] p-14 bg-card border-border/50 shadow-sm"
-            isSearch={!!searchString}
-            type={EmptyCardType.Agent}
+        <div className="flex w-full items-center justify-center py-20 gap-8">
+          <div
+            className="group cursor-pointer p-8 rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-glow hover:border-primary/50 transition-all duration-300 w-[320px] flex flex-col items-center text-center gap-4"
             onClick={() => showCreatingModal()}
-          />
+          >
+            <div className="p-4 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+              <Clipboard className="size-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold">{t('flow.createFromBlank')}</h3>
+              <p className="text-sm text-text-secondary">
+                {t('flow.ceateAgent')}
+              </p>
+            </div>
+            <div className="mt-2 text-primary font-medium flex items-center gap-2">
+              <Plus className="size-4" />
+              {t('common.create')}
+            </div>
+          </div>
+
+          <div
+            className="group cursor-pointer p-8 rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-glow hover:border-primary/50 transition-all duration-300 w-[320px] flex flex-col items-center text-center gap-4"
+            onClick={navigateToAgentTemplates}
+          >
+            <div className="p-4 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+              <ClipboardPlus className="size-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold">
+                {t('flow.createFromTemplate')}
+              </h3>
+              <p className="text-sm text-text-secondary">
+                {t('flow.chooseAgentType')}
+              </p>
+            </div>
+            <div className="mt-2 text-primary font-medium flex items-center gap-2">
+              <Plus className="size-4" />
+              {t('common.create')}
+            </div>
+          </div>
         </div>
       ) : (
         <>
