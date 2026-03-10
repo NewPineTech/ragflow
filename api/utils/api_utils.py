@@ -388,6 +388,7 @@ def get_parser_config(chunk_method, parser_config):
         "qa": {"raptor": {"use_raptor": False}, "graphrag": {"use_graphrag": False}},
         "tag": None,
         "resume": None,
+        "jd": None,
         "manual": {"raptor": {"use_raptor": False}, "graphrag": {"use_graphrag": False}},
         "table": None,
         "paper": {"raptor": {"use_raptor": False}, "graphrag": {"use_graphrag": False}},
