@@ -91,8 +91,14 @@ def chunk(filename, binary=None, callback=None, **kwargs):
             gc.collect()
         else:
             parser = RAGFlowDocxParser()
-            full_text = parser(binary)
-            # RAGFlowDocxParser returns a string directly
+            secs, tbls = parser(binary)
+            text_parts = [text for text, _ in secs if text.strip()]
+            for tb in tbls:
+                if isinstance(tb, list):
+                    text_parts.extend(tb)
+                elif isinstance(tb, str):
+                    text_parts.append(tb)
+            full_text = "\n".join(text_parts)
             
     except Exception as e:
         callback(-1, f"Parsing failed: {str(e)}")
