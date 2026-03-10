@@ -1,4 +1,4 @@
-import { CardSineLineContainer } from '@/components/card-singleline-container';
+import { CardContainer } from '@/components/card-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -107,7 +107,7 @@ export default function SearchList() {
               </div>
             )}
           <div className="flex-1">
-            <CardSineLineContainer>
+            <CardContainer>
               {list?.data.search_apps.map((x) => {
                 return (
                   <SearchCard
@@ -119,7 +119,7 @@ export default function SearchList() {
                   ></SearchCard>
                 );
               })}
-            </CardSineLineContainer>
+            </CardContainer>
           </div>
           {list?.data.total && list?.data.total > 0 && (
             <div className="flex justify-end mt-8">

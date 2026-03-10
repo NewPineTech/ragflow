@@ -1,4 +1,4 @@
-import { CardSineLineContainer } from '@/components/card-singleline-container';
+import { CardContainer } from '@/components/card-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -90,7 +90,7 @@ export default function ChatList() {
             </div>
           )}
           <div className="flex-1 overflow-auto">
-            <CardSineLineContainer>
+            <CardContainer>
               {data.dialogs.map((x) => {
                 return (
                   <ChatCard
@@ -100,7 +100,7 @@ export default function ChatList() {
                   ></ChatCard>
                 );
               })}
-            </CardSineLineContainer>
+            </CardContainer>
           </div>
           <div className="mt-8 flex justify-end">
             <RAGFlowPagination

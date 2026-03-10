@@ -1,4 +1,4 @@
-import { CardSineLineContainer } from '@/components/card-singleline-container';
+import { CardContainer } from '@/components/card-container';
 import { EmptyCardType } from '@/components/empty/constant';
 import { EmptyAppCard } from '@/components/empty/empty';
 import ListFilterBar from '@/components/list-filter-bar';
@@ -113,7 +113,7 @@ export default function Datasets() {
             </div>
           )}
           <div className="flex-1">
-            <CardSineLineContainer>
+            <CardContainer>
               {kbs.map((dataset) => {
                 return (
                   <DatasetCard
@@ -123,7 +123,7 @@ export default function Datasets() {
                   ></DatasetCard>
                 );
               })}
-            </CardSineLineContainer>
+            </CardContainer>
           </div>
           <div className="mt-8 flex justify-end">
             <RAGFlowPagination
