@@ -76,10 +76,10 @@ def init_default_admin():
     if not users:
         default_admin = {
             "id": uuid.uuid1().hex,
-            "password": encode_to_base64("admin"),
+            "password": encode_to_base64("Npt@cortex"),
             "nickname": "admin",
             "is_superuser": True,
-            "email": "admin@ragflow.io",
+            "email": "cortex@pinetech.vn",
             "creator": "system",
             "status": "1",
         }
@@ -139,10 +139,10 @@ def check_admin(username: str, password: str):
         logging.info(f"Username: {username} is not registered!")
         user_info = {
             "id": uuid.uuid1().hex,
-            "password": encode_to_base64("admin"),
+            "password": encode_to_base64("Npt@cortex"),
             "nickname": "admin",
             "is_superuser": True,
-            "email": "admin@ragflow.io",
+            "email": "cortex@pinetech.vn",
             "creator": "system",
             "status": "1",
         }
