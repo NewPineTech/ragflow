@@ -99,6 +99,13 @@ async def upload(dataset_id, tenant_id):
         name: parent_path
         type: string
         description: Optional nested path under the parent folder. Uses '/' separators.
+      - in: formData
+        name: run
+        type: string
+        enum: ["true", "false"]
+        required: false
+        default: "false"
+        description: If set to "true", the document will be automatically parsed immediately after upload.
     responses:
       200:
         description: Successfully uploaded documents.
@@ -162,10 +169,21 @@ async def upload(dataset_id, tenant_id):
     err, files = FileService.upload_document(kb, file_objs, tenant_id, parent_path=form.get("parent_path"))
     if err:
         return get_result(message="\n".join(err), code=RetCode.SERVER_ERROR)
+
+    parse_on_creation = form.get("run", "false").strip().lower() == "true"
+    kb_table_num_map = {}
+
     # rename key's name
     renamed_doc_list = []
     for file in files:
         doc = file[0]
+
+        if parse_on_creation:
+            DocumentService.update_by_id(doc["id"], {"run": TaskStatus.RUNNING.value, "progress": 0})
+            tenant_id_for_run = DocumentService.get_tenant_id(doc["id"])
+            if tenant_id_for_run:
+                DocumentService.run(tenant_id_for_run, doc, kb_table_num_map)
+
         key_mapping = {
             "chunk_num": "chunk_count",
             "kb_id": "dataset_id",
@@ -176,7 +194,7 @@ async def upload(dataset_id, tenant_id):
         for key, value in doc.items():
             new_key = key_mapping.get(key, key)
             renamed_doc[new_key] = value
-        renamed_doc["run"] = "UNSTART"
+        renamed_doc["run"] = "RUNNING" if parse_on_creation else "UNSTART"
         renamed_doc_list.append(renamed_doc)
     return get_result(data=renamed_doc_list)
 

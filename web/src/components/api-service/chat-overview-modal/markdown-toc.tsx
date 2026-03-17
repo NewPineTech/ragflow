@@ -66,7 +66,13 @@ const MarkdownToc: React.FC<MarkdownTocProps> = ({ content }) => {
         zIndex: 1000,
       }}
     >
-      <Anchor items={items} affix={false} />
+      <Anchor
+        items={items}
+        affix={false}
+        getContainer={() =>
+          (document.querySelector('.ant-modal-wrap') as HTMLElement) || window
+        }
+      />
     </div>
   );
 };
