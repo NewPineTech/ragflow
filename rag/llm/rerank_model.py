@@ -24,6 +24,7 @@ from yarl import URL
 
 from common.log_utils import log_exception
 from common.token_utils import num_tokens_from_string, truncate, total_token_count_from_response
+from common import safe_json_loads
 
 class Base(ABC):
     def __init__(self, key, model_name, **kwargs):
@@ -341,7 +342,7 @@ class BaiduYiyanRerank(Base):
     def __init__(self, key, model_name, base_url=None):
         from qianfan.resources import Reranker
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid BaiduYiyan configuration")
         ak = key.get("yiyan_ak", "")
         sk = key.get("yiyan_sk", "")
         self.client = Reranker(ak=ak, sk=sk)

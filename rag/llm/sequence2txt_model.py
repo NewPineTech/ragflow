@@ -26,6 +26,7 @@ from openai import OpenAI
 from openai.lib.azure import AzureOpenAI
 
 from common.token_utils import num_tokens_from_string
+from common import safe_json_loads
 
 
 class Base(ABC):
@@ -196,7 +197,7 @@ class TencentCloudSeq2txt(Base):
         from tencentcloud.asr.v20190614 import asr_client
         from tencentcloud.common import credential
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid Tencent Cloud configuration")
         sid = key.get("tencent_cloud_sid", "")
         sk = key.get("tencent_cloud_sk", "")
         cred = credential.Credential(sid, sk)

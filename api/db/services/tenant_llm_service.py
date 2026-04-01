@@ -137,56 +137,71 @@ class TenantLLMService(CommonService):
     def model_instance(cls, tenant_id, llm_type, llm_name=None, lang="Chinese", **kwargs):
         model_config = TenantLLMService.get_model_config(tenant_id, llm_type, llm_name)
         kwargs.update({"provider": model_config["llm_factory"]})
-        if llm_type == LLMType.EMBEDDING.value:
-            if model_config["llm_factory"] not in EmbeddingModel:
-                return None
-            return EmbeddingModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
-                                                               base_url=model_config["api_base"])
+        try:
+            if llm_type == LLMType.EMBEDDING.value:
+                if model_config["llm_factory"] not in EmbeddingModel:
+                    return None
+                return EmbeddingModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
+                                                                   base_url=model_config["api_base"])
 
-        elif llm_type == LLMType.RERANK:
-            if model_config["llm_factory"] not in RerankModel:
-                return None
-            return RerankModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
-                                                            base_url=model_config["api_base"])
+            elif llm_type == LLMType.RERANK:
+                if model_config["llm_factory"] not in RerankModel:
+                    return None
+                return RerankModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
+                                                                base_url=model_config["api_base"])
 
-        elif llm_type == LLMType.IMAGE2TEXT.value:
-            if model_config["llm_factory"] not in CvModel:
-                return None
-            return CvModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], lang,
-                                                        base_url=model_config["api_base"], **kwargs)
+            elif llm_type == LLMType.IMAGE2TEXT.value:
+                if model_config["llm_factory"] not in CvModel:
+                    return None
+                return CvModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], lang,
+                                                            base_url=model_config["api_base"], **kwargs)
 
-        elif llm_type == LLMType.CHAT.value:
-            if model_config["llm_factory"] not in ChatModel:
-                return None
-            return ChatModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
-                                                          base_url=model_config["api_base"], **kwargs)
+            elif llm_type == LLMType.CHAT.value:
+                if model_config["llm_factory"] not in ChatModel:
+                    return None
+                return ChatModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
+                                                              base_url=model_config["api_base"], **kwargs)
 
-        elif llm_type == LLMType.SPEECH2TEXT:
-            if model_config["llm_factory"] not in Seq2txtModel:
-                return None
-            return Seq2txtModel[model_config["llm_factory"]](key=model_config["api_key"],
-                                                             model_name=model_config["llm_name"], lang=lang,
-                                                             base_url=model_config["api_base"])
-        elif llm_type == LLMType.TTS:
-            if model_config["llm_factory"] not in TTSModel:
-                return None
-            return TTSModel[model_config["llm_factory"]](
-                model_config["api_key"],
-                model_config["llm_name"],
-                base_url=model_config["api_base"],
+            elif llm_type == LLMType.SPEECH2TEXT:
+                if model_config["llm_factory"] not in Seq2txtModel:
+                    return None
+                return Seq2txtModel[model_config["llm_factory"]](key=model_config["api_key"],
+                                                                 model_name=model_config["llm_name"], lang=lang,
+                                                                 base_url=model_config["api_base"])
+            elif llm_type == LLMType.TTS:
+                if model_config["llm_factory"] not in TTSModel:
+                    return None
+                return TTSModel[model_config["llm_factory"]](
+                    model_config["api_key"],
+                    model_config["llm_name"],
+                    base_url=model_config["api_base"],
+                )
+
+            elif llm_type == LLMType.OCR:
+                if model_config["llm_factory"] not in OcrModel:
+                    return None
+                return OcrModel[model_config["llm_factory"]](
+                    key=model_config["api_key"],
+                    model_name=model_config["llm_name"],
+                    base_url=model_config.get("api_base", ""),
+                    **kwargs,
+                )
+
+            return None
+
+        except ValueError as e:
+            factory = model_config.get("llm_factory", "Unknown")
+            model_name = model_config.get("llm_name", "Unknown")
+            logging.error(
+                "Model configuration error for %s/%s: %s. "
+                "Please check your API Key settings in 'User Setting -> Model Providers'.",
+                factory, model_name, e
             )
-
-        elif llm_type == LLMType.OCR:
-            if model_config["llm_factory"] not in OcrModel:
-                return None
-            return OcrModel[model_config["llm_factory"]](
-                key=model_config["api_key"],
-                model_name=model_config["llm_name"],
-                base_url=model_config.get("api_base", ""),
-                **kwargs,
+            raise LookupError(
+                f"Invalid API Key configuration for model '{model_name}' ({factory}). "
+                f"Please go to 'User Setting \u2192 Model Providers' and re-enter your credentials as valid JSON. "
+                f"Details: {e}"
             )
-
-        return None
 
     @classmethod
     @DB.connection_context()

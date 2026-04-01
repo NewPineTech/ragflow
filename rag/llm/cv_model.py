@@ -31,6 +31,7 @@ import requests
 from openai import OpenAI, AsyncOpenAI
 from openai.lib.azure import AzureOpenAI, AsyncAzureOpenAI
 
+from common import safe_json_loads
 from common.token_utils import num_tokens_from_string, total_token_count_from_response
 from rag.nlp import is_english
 from rag.prompts.generator import vision_llm_describe_prompt
@@ -219,8 +220,9 @@ class AzureGptV4(GptV4):
     _FACTORY_NAME = "Azure-OpenAI"
 
     def __init__(self, key, model_name, lang="Chinese", **kwargs):
-        api_key = json.loads(key).get("api_key", "")
-        api_version = json.loads(key).get("api_version", "2024-02-01")
+        cv_cfg = safe_json_loads(key, "Invalid AzureGptV4 configuration")
+        api_key = cv_cfg.get("api_key", "")
+        api_version = cv_cfg.get("api_version", "2024-02-01")
         self.client = AzureOpenAI(api_key=api_key, azure_endpoint=kwargs["base_url"], api_version=api_version)
         self.async_client = AsyncAzureOpenAI(api_key=api_key, azure_endpoint=kwargs["base_url"], api_version=api_version)
         self.model_name = model_name
@@ -427,10 +429,11 @@ class VolcEngineCV(GptV4):
     def __init__(self, key, model_name, lang="Chinese", base_url="https://ark.cn-beijing.volces.com/api/v3", **kwargs):
         if not base_url:
             base_url = "https://ark.cn-beijing.volces.com/api/v3"
-        ark_api_key = json.loads(key).get("ark_api_key", "")
+        cv_cfg = safe_json_loads(key, "Invalid VolcEngine configuration")
+        ark_api_key = cv_cfg.get("ark_api_key", "")
         self.client = OpenAI(api_key=ark_api_key, base_url=base_url)
         self.async_client = AsyncOpenAI(api_key=ark_api_key, base_url=base_url)
-        self.model_name = json.loads(key).get("ep_id", "") + json.loads(key).get("endpoint_id", "")
+        self.model_name = cv_cfg.get("ep_id", "") + cv_cfg.get("endpoint_id", "")
         self.lang = lang
         Base.__init__(self, **kwargs)
 
@@ -496,13 +499,14 @@ class OpenRouterCV(GptV4):
     def __init__(self, key, model_name, lang="Chinese", base_url="https://openrouter.ai/api/v1", **kwargs):
         if not base_url:
             base_url = "https://openrouter.ai/api/v1"
-        api_key = json.loads(key).get("api_key", "")
+        cv_cfg = safe_json_loads(key, "Invalid OpenRouter configuration")
+        api_key = cv_cfg.get("api_key", "")
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model_name = model_name
         self.lang = lang
         Base.__init__(self, **kwargs)
-        provider_order = json.loads(key).get("provider_order", "")
+        provider_order = cv_cfg.get("provider_order", "")
         self.extra_body = {}
         if provider_order:
 
@@ -1085,7 +1089,7 @@ class GoogleCV(AnthropicCV, GeminiCV):
 
         from google.oauth2 import service_account
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid Google Cloud configuration")
         access_token = json.loads(base64.b64decode(key.get("google_service_account_key", "")))
         project_id = key.get("google_project_id", "")
         region = key.get("google_region", "")

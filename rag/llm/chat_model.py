@@ -30,6 +30,7 @@ import openai
 from openai import AsyncOpenAI, OpenAI
 from strenum import StrEnum
 
+from common import safe_json_loads
 from common.token_utils import num_tokens_from_string, total_token_count_from_response
 from rag.llm import FACTORY_DEFAULT_BASE_URL, LITELLM_PROVIDER_PREFIX, SupportedLiteLLMProvider
 from rag.nlp import is_chinese, is_english
@@ -658,8 +659,8 @@ class VolcEngineChat(Base):
         model_name is for display only
         """
         base_url = base_url if base_url else "https://ark.cn-beijing.volces.com/api/v3"
-        ark_api_key = json.loads(key).get("ark_api_key", "")
-        model_name = json.loads(key).get("ep_id", "") + json.loads(key).get("endpoint_id", "")
+        ark_api_key = safe_json_loads(key, "Invalid VolcEngine configuration").get("ark_api_key", "")
+        model_name = safe_json_loads(key, "Invalid VolcEngine configuration").get("ep_id", "") + safe_json_loads(key, "Invalid VolcEngine configuration").get("endpoint_id", "")
         super().__init__(ark_api_key, model_name, base_url, **kwargs)
 
 
@@ -798,7 +799,7 @@ class HunyuanChat(Base):
         from tencentcloud.common import credential
         from tencentcloud.hunyuan.v20230901 import hunyuan_client
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid Tencent Hunyuan configuration")
         sid = key.get("hunyuan_sid", "")
         sk = key.get("hunyuan_sk", "")
         cred = credential.Credential(sid, sk)
@@ -897,7 +898,7 @@ class BaiduYiyanChat(Base):
 
         import qianfan
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid BaiduYiyan configuration")
         ak = key.get("yiyan_ak", "")
         sk = key.get("yiyan_sk", "")
         self.client = qianfan.ChatCompletion(ak=ak, sk=sk)
@@ -947,7 +948,7 @@ class GoogleChat(Base):
 
         from google.oauth2 import service_account
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid Google Cloud configuration")
         access_token = json.loads(base64.b64decode(key.get("google_service_account_key", "")))
         project_id = key.get("google_project_id", "")
         region = key.get("google_region", "")
@@ -1232,11 +1233,13 @@ class LiteLLMBase(ABC):
 
         # Factory specific fields
         if self.provider == SupportedLiteLLMProvider.OpenRouter:
-            self.api_key = json.loads(key).get("api_key", "")
-            self.provider_order = json.loads(key).get("provider_order", "")
+            key_cfg = safe_json_loads(key, "Invalid OpenRouter configuration")
+            self.api_key = key_cfg.get("api_key", "")
+            self.provider_order = key_cfg.get("provider_order", "")
         elif self.provider == SupportedLiteLLMProvider.Azure_OpenAI:
-            self.api_key = json.loads(key).get("api_key", "")
-            self.api_version = json.loads(key).get("api_version", "2024-02-01")
+            key_cfg = safe_json_loads(key, "Invalid Azure-OpenAI configuration")
+            self.api_key = key_cfg.get("api_key", "")
+            self.api_version = key_cfg.get("api_version", "2024-02-01")
 
     def _get_delay(self):
         return self.base_delay * random.uniform(10, 150)

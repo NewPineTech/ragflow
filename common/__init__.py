@@ -13,3 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+
+def safe_json_loads(s, error_msg="Invalid JSON format"):
+    import json
+    if isinstance(s, dict):
+        return s
+    if not s:
+        return {}
+    try:
+        return json.loads(s)
+    except (json.JSONDecodeError, TypeError):
+        raise ValueError(error_msg)

@@ -30,6 +30,7 @@ from zhipuai import ZhipuAI
 from common.log_utils import log_exception
 from common.token_utils import num_tokens_from_string, truncate, total_token_count_from_response
 from common import settings
+from common import safe_json_loads
 import logging
 import base64
 
@@ -156,8 +157,9 @@ class AzureEmbed(OpenAIEmbed):
     def __init__(self, key, model_name, **kwargs):
         from openai.lib.azure import AzureOpenAI
 
-        api_key = json.loads(key).get("api_key", "")
-        api_version = json.loads(key).get("api_version", "2024-02-01")
+        emb_cfg = safe_json_loads(key, "Invalid Azure-OpenAI configuration")
+        api_key = emb_cfg.get("api_key", "")
+        api_version = emb_cfg.get("api_version", "2024-02-01")
         self.client = AzureOpenAI(api_key=api_key, azure_endpoint=kwargs["base_url"], api_version=api_version)
         self.model_name = model_name
 
@@ -470,7 +472,7 @@ class BedrockEmbed(Base):
         #   - "access_key_secret": requires `bedrock_ak` + `bedrock_sk`.
         #   - "iam_role": requires `aws_role_arn` and assumes role via STS.
         #   - else: treated as "assume_role" (default AWS credential chain).
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid Bedrock configuration")
         mode = key.get("auth_mode")
         if not mode:
             logging.error("Bedrock auth_mode is not provided in the key")
@@ -797,7 +799,7 @@ class BaiduYiyanEmbed(Base):
     def __init__(self, key, model_name, base_url=None):
         import qianfan
 
-        key = json.loads(key)
+        key = safe_json_loads(key, "Invalid BaiduYiyan configuration")
         ak = key.get("yiyan_ak", "")
         sk = key.get("yiyan_sk", "")
         self.client = qianfan.Embedding(ak=ak, sk=sk)
@@ -891,8 +893,9 @@ class VolcEngineEmbed(OpenAIEmbed):
     def __init__(self, key, model_name, base_url="https://ark.cn-beijing.volces.com/api/v3"):
         if not base_url:
             base_url = "https://ark.cn-beijing.volces.com/api/v3"
-        ark_api_key = json.loads(key).get("ark_api_key", "")
-        model_name = json.loads(key).get("ep_id", "") + json.loads(key).get("endpoint_id", "")
+        idx_cfg = safe_json_loads(key, "Invalid VolcEngine configuration")
+        ark_api_key = idx_cfg.get("ark_api_key", "")
+        model_name = idx_cfg.get("ep_id", "") + idx_cfg.get("endpoint_id", "")
         super().__init__(ark_api_key, model_name, base_url)
 
 

@@ -19,6 +19,7 @@ import os
 from typing import Any, Optional
 
 from deepdoc.parser.mineru_parser import MinerUParser
+from common import safe_json_loads
 
 
 class Base:
@@ -34,12 +35,8 @@ class MinerUOcrModel(Base, MinerUParser):
 
     def __init__(self, key: str | dict, model_name: str, **kwargs):
         Base.__init__(self, key, model_name, **kwargs)
-        raw_config = {}
-        if key:
-            try:
-                raw_config = json.loads(key)
-            except Exception:
-                raw_config = {}
+        raw_config = safe_json_loads(key, "Invalid MinerU configuration")
+
 
         # nested {"api_key": {...}} from UI
         # flat {"MINERU_*": "..."} payload auto-provisioned from env vars

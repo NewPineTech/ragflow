@@ -407,21 +407,8 @@ def classify_and_respond(dialog, messages, stream=True):
         answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(system_content, msg, dialog.llm_setting))
         prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
         completion_tokens = num_tokens_from_string(answer)
-        yield {
-            "answer": answer, 
-            "reference": {}, 
-            "audio_binary": tts(tts_mdl, answer), 
-            "prompt": "", 
-            "created_at": time.time(),
-            "token_usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": prompt_tokens + completion_tokens
-            }
-        }
-        logging.info(f"Assistant: {answer}")
-        
-        # Extract classification
+
+        # Extract classification before yielding
         if "[CLASSIFY:KB]" in answer:
             classify_type = "KB"
         elif "[CLASSIFY:GREET]" in answer:
@@ -429,13 +416,25 @@ def classify_and_respond(dialog, messages, stream=True):
         elif "[CLASSIFY:SENSITIVE]" in answer:
             classify_type = "SENSITIVE"
         else:
-            # Fallback: No classification found, default to KB
-            logging.warning(f"[CLASSIFY_AND_RESPOND] Non-stream: No classification detected,  Answer: {answer[:100]}...")
+            logging.warning(f"[CLASSIFY_AND_RESPOND] Non-stream: No classification detected, Answer: {answer[:100]}...")
             classify_type = "KB"
-        clean_answer = answer.replace("[CLASSIFY:KB]", "").replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
 
+        clean_answer = answer.replace("[CLASSIFY:KB]", "").replace("[CLASSIFY:GREET]", "").replace("[CLASSIFY:SENSITIVE]", "").strip()
         logging.info(f"User: {msg[-1].get('content', '')}|Classify: {classify_type}|Assistant: {clean_answer}")
-        yield {"answer": clean_answer, "reference": {}, "audio_binary": tts(tts_mdl, clean_answer), "prompt": "", "created_at": time.time(), "classify_type": classify_type}
+
+        yield {
+            "answer": clean_answer,
+            "reference": {},
+            "audio_binary": tts(tts_mdl, clean_answer),
+            "prompt": "",
+            "created_at": time.time(),
+            "classify_type": classify_type,
+            "token_usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
 
 
 def chat_solo(dialog, messages, stream=True, memory_text=None):
@@ -984,9 +983,17 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             logging.info(f"[CHATV1] KB initial response collected: {kb_initial_response[:100]}")
             # Continue with KB retrieval flow below
         elif classify_type in ["GREET", "SENSITIVE"]:
-            # Stream GREET/SENSITIVE responses and return
+            # Stream GREET/SENSITIVE responses and return.
+            # classify_and_respond sets token_usage=None on intermediate chunks and
+            # only populates it on the final chunk — extract it and attach to last yield.
             logging.info(f"[CHATV1] Non-KB question ({classify_type}) - streaming response")
+            final_token_usage = None
             for resp in collected_responses:
+                if resp.get("token_usage") is not None:
+                    final_token_usage = resp["token_usage"]
+            for i, resp in enumerate(collected_responses):
+                is_last = (i == len(collected_responses) - 1)
+                resp["token_usage"] = final_token_usage if is_last else None
                 yield resp
             return
         else:
