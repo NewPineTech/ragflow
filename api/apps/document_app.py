@@ -80,6 +80,14 @@ async def upload():
 
     if not files:
         return get_json_result(data=files, message="There seems to be an issue with your file format. Please verify it is correct and not corrupted.", code=RetCode.DATA_ERROR)
+
+    run = form.get("run")
+    kb_table_num_map = {}
+    for f, blob in files:
+        if run:
+            DocumentService.begin2parse(f["id"])
+            DocumentService.run(kb.tenant_id, f, kb_table_num_map)
+
     files = [f[0] for f in files]  # remove the blob
 
     return get_json_result(data=files)

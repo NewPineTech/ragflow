@@ -56,11 +56,18 @@ export const useUploadNextDocument = () => {
     data,
     isPending: loading,
     mutateAsync,
-  } = useMutation<ResponseType<IDocumentInfo[]>, Error, File[]>({
+  } = useMutation<
+    ResponseType<IDocumentInfo[]>,
+    Error,
+    { fileList: File[]; run?: boolean }
+  >({
     mutationKey: [DocumentApiAction.UploadDocument],
-    mutationFn: async (fileList) => {
+    mutationFn: async ({ fileList, run }) => {
       const formData = new FormData();
       formData.append('kb_id', id!);
+      if (run) {
+        formData.append('run', '1');
+      }
       fileList.forEach((file: any) => {
         formData.append('file', file);
       });

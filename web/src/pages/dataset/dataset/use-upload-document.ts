@@ -19,17 +19,9 @@ export const useHandleUploadDocument = () => {
   const onDocumentUploadOk = useCallback(
     async ({ fileList, parseOnCreation }: UploadFormSchemaType) => {
       if (fileList.length > 0) {
-        const ret = await uploadDocument(fileList);
+        const ret = await uploadDocument({ fileList, run: parseOnCreation });
         if (typeof ret?.message !== 'string') {
           return;
-        }
-
-        if (ret.code === 0 && parseOnCreation) {
-          runDocumentByIds({
-            documentIds: ret.data.map((x) => x.id),
-            run: 1,
-            shouldDelete: false,
-          });
         }
 
         const count = getUnSupportedFilesCount(ret?.message);

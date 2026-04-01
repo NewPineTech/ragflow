@@ -361,9 +361,23 @@ def classify_and_respond(dialog, messages, stream=True):
             
             # Yield response for all types (KB, GREET, SENSITIVE)
             if is_final:
-                yield {"answer": clean_answer, "reference": {}, "audio_binary": tts(tts_mdl, clean_answer) if classify_type in ["GREET", "SENSITIVE"] else None, "prompt": "", "created_at": time.time(), "classify_type": classify_type}
+                prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
+                completion_tokens = num_tokens_from_string(clean_answer)
+                yield {
+                    "answer": clean_answer, 
+                    "reference": {}, 
+                    "audio_binary": tts(tts_mdl, clean_answer) if classify_type in ["GREET", "SENSITIVE"] else None, 
+                    "prompt": "", 
+                    "created_at": time.time(), 
+                    "classify_type": classify_type,
+                    "token_usage": {
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": prompt_tokens + completion_tokens
+                    }
+                }
             else:
-                yield {"answer": clean_answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time(), "classify_type": classify_type}
+                yield {"answer": clean_answer, "reference": {}, "audio_binary": None, "prompt": "", "created_at": time.time(), "classify_type": classify_type, "token_usage": None}
         
         # Final response handling
         if classify_type in ["GREET", "SENSITIVE"]:
@@ -373,11 +387,38 @@ def classify_and_respond(dialog, messages, stream=True):
             # Fallback: LLM didn't return proper format, yield directly
             logging.warning(f"[CLASSIFY_AND_RESPOND] No classification detected after all chunks. Answer: {answer[:100] if 'answer' in locals() else 'N/A'}...")
             if 'answer' in locals() and answer:
-                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
+                prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
+                completion_tokens = num_tokens_from_string(answer)
+                yield {
+                    "answer": answer, 
+                    "reference": {}, 
+                    "audio_binary": tts(tts_mdl, answer), 
+                    "prompt": "", 
+                    "created_at": time.time(),
+                    "token_usage": {
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": prompt_tokens + completion_tokens
+                    }
+                }
 
     else:
         classify_type = None
         answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(system_content, msg, dialog.llm_setting))
+        prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
+        completion_tokens = num_tokens_from_string(answer)
+        yield {
+            "answer": answer, 
+            "reference": {}, 
+            "audio_binary": tts(tts_mdl, answer), 
+            "prompt": "", 
+            "created_at": time.time(),
+            "token_usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
         logging.info(f"Assistant: {answer}")
         
         # Extract classification
@@ -422,14 +463,38 @@ def chat_solo(dialog, messages, stream=True, memory_text=None):
             logging.debug(f"[CHAT_SOLO] Yielding delta_len={len(delta_ans)}: {answer[:50]}...")
             
             if is_final:
-                yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, delta_ans), "memory": memory_text if memory_text else None}
+                prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
+                completion_tokens = num_tokens_from_string(answer)
+                yield {
+                    "answer": answer, 
+                    "reference": {}, 
+                    "audio_binary": tts(tts_mdl, delta_ans), 
+                    "memory": memory_text if memory_text else None,
+                    "token_usage": {
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": prompt_tokens + completion_tokens
+                    }
+                }
             else:
-                yield {"answer": answer, "reference": {}, "audio_binary": None, "memory": None}
+                yield {"answer": answer, "reference": {}, "audio_binary": None, "memory": None, "token_usage": None}
     else:
         answer = chat_mdl._run_coroutine_sync(chat_mdl.async_chat(system_content, msg[-1:], {}))
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("[CHATV1] User: {}|Assistant: {}".format(user_content, answer))
-        yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "memory": memory_text if memory_text else None}
+        prompt_tokens = num_tokens_from_string(system_content) + num_tokens_from_string(msg[-1]["content"])
+        completion_tokens = num_tokens_from_string(answer)
+        yield {
+            "answer": answer, 
+            "reference": {}, 
+            "audio_binary": tts(tts_mdl, answer), 
+            "memory": memory_text if memory_text else None,
+            "token_usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
 
 
 def get_models(dialog):
@@ -1164,12 +1229,19 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
     
     if not knowledges and prompt_config.get("empty_response"):
         empty_res = prompt_config["empty_response"]
+        prompt_tokens = num_tokens_from_string(" ".join(questions))
+        completion_tokens = num_tokens_from_string(empty_res)
         yield {
             "answer": empty_res, 
             "reference": kbinfos, 
             "prompt": "\n\n### Query:\n%s" % " ".join(questions),
             "audio_binary": tts(tts_mdl, empty_res),
-            "memory": memory_text if memory_text else None
+            "memory": memory_text if memory_text else None,
+            "token_usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
         }
         return
 
@@ -1341,7 +1413,12 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             "prompt": re.sub(r"\n", "  \n", prompt), 
             "created_at": time.time(),
             "memory": memory_text if memory_text else None,
-            "suggested_questions": suggested_questions
+            "suggested_questions": suggested_questions,
+            "token_usage": {
+                "prompt_tokens": num_tokens_from_string(prompt),
+                "completion_tokens": tk_num,
+                "total_tokens": num_tokens_from_string(prompt) + tk_num
+            }
         }
 
     if langfuse_tracer:
@@ -1359,7 +1436,7 @@ async def chatv1(dialog, messages, stream=True, **kwargs):
             
             # 🔧 Prepend KB initial response to maintain continuity
             full_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
-            yield {"answer": full_answer, "reference": {}, "audio_binary": None, "memory": None}
+            yield {"answer": full_answer, "reference": {}, "audio_binary": None, "memory": None, "token_usage": None}
         
         # Include KB initial response in final decorated answer
         final_answer = kb_initial_response + "\n\n" + thought + answer if kb_initial_response else thought + answer
@@ -1477,7 +1554,18 @@ Please write the SQL, only SQL, without any other explanations or text.
 
     if not docid_idx or not doc_name_idx:
         logging.warning("SQL missing field: " + sql)
-        return {"answer": "\n".join([columns, line, rows]), "reference": {"chunks": [], "doc_aggs": []}, "prompt": sys_prompt}
+        prompt_tokens = num_tokens_from_string(sys_prompt) + num_tokens_from_string(user_prompt)
+        completion_tokens = num_tokens_from_string(columns + line + rows)
+        return {
+            "answer": "\n".join([columns, line, rows]), 
+            "reference": {"chunks": [], "doc_aggs": []}, 
+            "prompt": sys_prompt,
+            "token_usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens
+            }
+        }
 
     docid_idx = list(docid_idx)[0]
     doc_name_idx = list(doc_name_idx)[0]
@@ -1486,6 +1574,8 @@ Please write the SQL, only SQL, without any other explanations or text.
         if r[docid_idx] not in doc_aggs:
             doc_aggs[r[docid_idx]] = {"doc_name": r[doc_name_idx], "count": 0}
         doc_aggs[r[docid_idx]]["count"] += 1
+    prompt_tokens = num_tokens_from_string(sys_prompt) + num_tokens_from_string(user_prompt)
+    completion_tokens = num_tokens_from_string(columns + line + rows)
     return {
         "answer": "\n".join([columns, line, rows]),
         "reference": {
@@ -1493,6 +1583,11 @@ Please write the SQL, only SQL, without any other explanations or text.
             "doc_aggs": [{"doc_id": did, "doc_name": d["doc_name"], "count": d["count"]} for did, d in doc_aggs.items()],
         },
         "prompt": sys_prompt,
+        "token_usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens
+        }
     }
 
 def clean_tts_text(text: str) -> str:
