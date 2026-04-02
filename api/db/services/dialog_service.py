@@ -278,10 +278,10 @@ def stream_llm_with_delta_check(chat_mdl, system_content, messages, gen_conf, mi
             last_ans = answer
             yield (answer, delta_ans, False)
         
-        # Final chunk: ensure complete answer is yielded
-        if len(answer) > len(last_ans):
-            delta_ans = answer[len(last_ans):]
-            yield (answer, delta_ans, True)
+        # Final chunk: always yield is_final=True so callers can compute token_usage.
+        # delta_ans may be empty if the last intermediate chunk already flushed everything.
+        delta_ans = answer[len(last_ans):]
+        yield (answer, delta_ans, True)
             
         # Give async tasks time to complete cleanup
         try:
