@@ -32,6 +32,12 @@ ENV UV_INDEX_URL=https://pypi.org/simple
 # python-pptx:   default-jdk                              tika-server-standard-3.0.0.jar
 # selenium:      libatk-bridge2.0-0                       chrome-linux64-121-0-6167-85
 # Building C extensions: libpython3-dev libgtk-4-1 libnss3 xdg-utils libgbm-dev
+
+RUN if [ -f /etc/apt/sources.list ]; then \
+      sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://mirror.biznetgio.com/ubuntu-ports|g' /etc/apt/sources.list; \
+      sed -i 's|http://archive.ubuntu.com|http://mirror.biznetgio.com|g' /etc/apt/sources.list; \
+    fi 
+
 RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt update && \
     apt --no-install-recommends install -y ca-certificates; \
@@ -56,7 +62,20 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y fonts-freefont-ttf fonts-noto-cjk
 
 # Install uv
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+RUN arch="$(uname -m)"; \
+    if [ "$arch" = "arm64" ] || [ "$arch" = "aarch64" ]; then \
+        uv_arch="aarch64-unknown-linux-gnu"; \
+    else \
+        uv_arch="x86_64-unknown-linux-gnu"; \
+    fi; \
+    if [ -f "/deps/uv-$uv_arch.tar.gz" ]; then \
+        tar xzf "/deps/uv-$uv_arch.tar.gz" && \
+        cp "uv-$uv_arch"/* /usr/local/bin/ && \
+        rm -rf "uv-$uv_arch"; \
+    else \
+        curl -LsSf https://astral.sh/uv/install.sh | sh && \
+        mv /root/.local/bin/uv /root/.local/bin/uvx /usr/local/bin/; \
+    fi; \
     if [ "$NEED_MIRROR" == "1" ]; then \
         mkdir -p /etc/uv && \
         echo 'python-install-mirror = "https://registry.npmmirror.com/-/binary/python-build-standalone/"' > /etc/uv/uv.toml && \
@@ -64,10 +83,7 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps 
         echo 'url = "https://pypi.tuna.tsinghua.edu.cn/simple"' >> /etc/uv/uv.toml && \
         echo 'default = true' >> /etc/uv/uv.toml; \
     fi; \
-    tar xzf /deps/uv-x86_64-unknown-linux-gnu.tar.gz \
-    && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
-    && rm -rf uv-x86_64-unknown-linux-gnu \
-    && uv python install 3.11
+    uv python install 3.11
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV PATH=/root/.local/bin:$PATH
@@ -127,11 +143,12 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chromedriver-l
 
 # https://forum.aspose.com/t/aspose-slides-for-net-no-usable-version-of-libssl-found-with-linux-server/271344/13
 # aspose-slides on linux/arm64 is unavailable
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
-    if [ "$(uname -m)" = "x86_64" ]; then \
-        dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_amd64.deb; \
+RUN if [ "$(uname -m)" = "x86_64" ]; then \
+        wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb && \
+        dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb && rm libssl1.1_1.1.1f-1ubuntu2_amd64.deb; \
     elif [ "$(uname -m)" = "aarch64" ]; then \
-        dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_arm64.deb; \
+        wget http://ports.ubuntu.com/ubuntu-ports/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_arm64.deb && \
+        dpkg -i libssl1.1_1.1.1f-1ubuntu2_arm64.deb && rm libssl1.1_1.1.1f-1ubuntu2_arm64.deb; \
     fi
 
 

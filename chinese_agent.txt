@@ -1,0 +1,79 @@
+/Users/khoiphan/projects/ragflow/agent/tools/exesql.py:90:return float(obj)  # 或 str(obj)
+/Users/khoiphan/projects/ragflow/agent/tools/akshare.py:48:ak_res = [{"content": '<a href="' + i["新闻链接"] + '">' + i["新闻标题"] + '</a>\n 新闻内容: ' + i[
+/Users/khoiphan/projects/ragflow/agent/tools/akshare.py:49:"新闻内容"] + " \n发布时间:" + i["发布时间"] + " \n文章来源: " + i["文章来源"]} for index, i in stock_news_em_df.iterrows()]
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:7:"prologue": "您好！我是AGI方向的猎头，了解到您是这方面的大佬，然后冒昧的就联系到您。这边有个机会想和您分享，RAGFlow正在招聘您这个岗位的资深的工程师不知道您那边是不是感兴趣？"
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:28:"description": "该问题关于职位本身或公司的信息。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:29:"examples": "什么岗位？\n汇报对象是谁?\n公司多少人？\n公司有啥产品？\n具体工作内容是啥？\n地点哪里？\n双休吗？",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:33:"description": "该问题不关于职位本身或公司的信息，属于闲聊。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:34:"examples": "你好\n好久不见\n你男的女的？\n你是猴子派来的救兵吗？\n上午开会了?\n你叫啥？\n最近市场如何?生意好做吗？",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:38:"description": "该回答表示他对于该职位感兴趣。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:39:"examples": "嗯\n说吧\n说说看\n还好吧\n是的\n哦\nyes\n具体说说",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:43:"description": "该回答表示他对于该职位不感兴趣，或感觉受到骚扰。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:44:"examples": "不需要\n不感兴趣\n暂时不看\n不要\nno\n我已经不干这个了\n我不是这个方向的",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:63:"我简单介绍以下：\nRAGFlow 是一款基于深度文档理解构建的开源 RAG（Retrieval-Augmented Generation）引擎。RAGFlow 可以为各种规模的企业及个人提供一套精简的 RAG 工作流程，结合大语言模型（LLM）针对用户各类不同的复杂格式数据提供可靠的问答以及有理有据的引用。https://github.com/infiniflow/ragflow\n您那边还有什么要了解的？"
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:91:"description": "该问题关于职位本身或公司的信息。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:92:"examples": "什么岗位？\n汇报对象是谁?\n公司多少人？\n公司有啥产品？\n具体工作内容是啥？\n地点哪里？\n双休吗？",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:96:"description": "该问题不关于职位本身或公司的信息，属于闲聊。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:97:"examples": "你好\n好久不见\n你男的女的？\n你是猴子派来的救兵吗？\n上午开会了?\n你叫啥？\n最近市场如何?生意好做吗？",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:101:"description": "该回答表示他愿意加微信,或者已经报了微信号。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:102:"examples": "嗯\n可以\n是的\n哦\nyes\n15002333453\nwindblow_2231",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:106:"description": "该回答表示他不愿意加微信。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:107:"examples": "不需要\n不感兴趣\n暂时不看\n不要\nno\n不方便\n不知道还要加我微信",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:127:"prompt": "你是AGI方向的猎头，现在候选人的聊了和职位无关的话题，请耐心的回应候选人，并将话题往该AGI的职位上带，最好能要到候选人微信号以便后面保持联系。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:156:"prompt": "你是AGI方向的猎头，候选人问了有关职位或公司的问题，你根据以下职位信息回答。如果职位信息中不包含候选人的问题就回答不清楚、不知道、有待确认等。回答完后引导候选人加微信号，如：\n - 方便加一下微信吗，我把JD发您看看？\n  - 微信号多少，我把详细职位JD发您？\n      职位信息如下:\n      {input}\n      职位信息如上。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:168:"prompt": "你是AGI方向的猎头，候选人表示不反感加微信，如果对方已经报了微信号，表示感谢和信任并表示马上会加上；如果没有，则问对方微信号多少。你的微信号是weixin_kevin，E-mail是kkk@ragflow.com。说话不要重复。不要总是您好。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:182:"prompt": "你是AGI方向的猎头，当你提出加微信时对方表示拒绝。你需要耐心礼貌的回应候选人，表示对于保护隐私信息给予理解，也可以询问他对该职位的看法和顾虑。并在恰当的时机再次询问微信联系方式。也可以鼓励候选人主动与你取得联系。你的微信号是weixin_kevin，E-mail是kkk@ragflow.com。说话不要重复。不要总是您好。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:196:"好的，祝您生活愉快，工作顺利。",
+/Users/khoiphan/projects/ragflow/agent/test/dsl_examples/headhunter_zh.json:197:"哦，好的，感谢您宝贵的时间！"
+/Users/khoiphan/projects/ragflow/agent/templates/stock_research_report.json:6:"zh": "股票研究报告智能体"
+/Users/khoiphan/projects/ragflow/agent/templates/stock_research_report.json:11:"zh": "这个模板可以帮助金融分析师快速整理信息——它能够自动获取公司数据、整合财务指标，并汇总研报观点。"
+/Users/khoiphan/projects/ragflow/agent/templates/seo_blog.json:6:"zh": "生成SEO博客"},
+/Users/khoiphan/projects/ragflow/agent/templates/seo_blog.json:10:"zh": "此工作流根据简单的用户输入自动生成完整的SEO博客文章。你无需任何写作经验，只需提供一个主题或简短请求，系统将处理其余部分。"},
+/Users/khoiphan/projects/ragflow/agent/templates/user_interaction.json:5:"zh": "可交互的 Agent"
+/Users/khoiphan/projects/ragflow/agent/templates/user_interaction.json:9:"zh": "在 Agent 的运行过程中，用户可以随时介入，与 Agent 进行交互，以调整或引导生成结果，使最终输出更符合预期。"
+/Users/khoiphan/projects/ragflow/agent/templates/knowledge_base_report_r.json:6:"zh": "知识库检索智能体"},
+/Users/khoiphan/projects/ragflow/agent/templates/knowledge_base_report_r.json:10:"zh": "一个使用本地知识库的报告生成助手，具备高级能力，包括任务规划、推理和反思性分析。推荐用于学术研究论文问答。"},
+/Users/khoiphan/projects/ragflow/agent/templates/customer_support.json:7:"zh": "客户支持"},
+/Users/khoiphan/projects/ragflow/agent/templates/customer_support.json:11:"zh": "工作流系统，用于智能客服场景。基于用户意图分类。使用大模型识别用户需求类型，并将需求转移给相应的智能体进行处理。"},
+/Users/khoiphan/projects/ragflow/agent/templates/market_generate_seo_blog.json:6:"zh": "生成SEO博客"},
+/Users/khoiphan/projects/ragflow/agent/templates/market_generate_seo_blog.json:10:"zh": "此工作流根据简单的用户输入自动生成完整的SEO博客文章。你无需任何写作经验，只需提供一个主题或简短请求，系统将处理其余部分。"},
+/Users/khoiphan/projects/ragflow/agent/templates/choose_your_knowledge_base_agent.json:6:"zh": "选择知识库智能体"},
+/Users/khoiphan/projects/ragflow/agent/templates/choose_your_knowledge_base_agent.json:10:"zh": "从下拉菜单中选择知识库，智能体将仅根据所选知识库内容生成回答。"},
+/Users/khoiphan/projects/ragflow/agent/templates/advanced_ingestion_pipeline.json:6:"zh": "编排复杂的 Ingestion Pipeline"
+/Users/khoiphan/projects/ragflow/agent/templates/advanced_ingestion_pipeline.json:11:"zh": "此模板演示如何利用大模型为切片生成摘要、关键词、问答及元数据，以满足多样化的召回需求。"
+/Users/khoiphan/projects/ragflow/agent/templates/deep_search_r.json:7:"zh": "深度研究"},
+/Users/khoiphan/projects/ragflow/agent/templates/deep_search_r.json:11:"zh": "专为销售、市场、政策或咨询领域的专业人士设计，多智能体的深度研究会结合多源信息进行结构化、多步骤地回答问题，并附带有清晰的引用。"},
+/Users/khoiphan/projects/ragflow/agent/templates/knowledge_base_report.json:6:"zh": "知识库检索智能体"},
+/Users/khoiphan/projects/ragflow/agent/templates/knowledge_base_report.json:10:"zh": "一个使用本地知识库的报告生成助手，具备高级能力，包括任务规划、推理和反思性分析。推荐用于学术研究论文问答。"},
+/Users/khoiphan/projects/ragflow/agent/templates/web_search_assistant.json:7:"zh": "网页搜索助手"},
+/Users/khoiphan/projects/ragflow/agent/templates/web_search_assistant.json:11:"zh": "集成了从知识库和网络搜索中提取的信息回答用户问题。让我们从设置您的知识库开始检索！"},
+/Users/khoiphan/projects/ragflow/agent/templates/web_search_assistant.json:301:"sys.query": "你好",
+/Users/khoiphan/projects/ragflow/agent/templates/web_search_assistant.json:853:"你好"
+/Users/khoiphan/projects/ragflow/agent/templates/ecommerce_customer_service_workflow.json:6:"zh": "电子商务客户服务工作流程"
+/Users/khoiphan/projects/ragflow/agent/templates/ecommerce_customer_service_workflow.json:11:"zh": "该模板可帮助电子商务平台解决复杂的客户需求，例如比较产品功能、提供使用支持和协调家庭安装服务。"
+/Users/khoiphan/projects/ragflow/agent/templates/generate_SEO_blog.json:6:"zh": "生成SEO博客"},
+/Users/khoiphan/projects/ragflow/agent/templates/generate_SEO_blog.json:10:"zh": "多智能体架构可根据简单的用户输入自动生成完整的SEO博客文章。模拟小型“作家”团队，其中每个智能体扮演一个专业角色——就像真正的编辑团队。"},
+/Users/khoiphan/projects/ragflow/agent/templates/choose_your_knowledge_base_workflow.json:6:"zh": "选择知识库工作流"},
+/Users/khoiphan/projects/ragflow/agent/templates/choose_your_knowledge_base_workflow.json:10:"zh": "从下拉菜单中选择知识库，工作流将仅根据所选知识库内容生成回答。"},
+/Users/khoiphan/projects/ragflow/agent/templates/image_lingo.json:6:"zh": "图片解析"},
+/Users/khoiphan/projects/ragflow/agent/templates/image_lingo.json:10:"zh": "多模态大模型允许您拍摄任何包含文本的照片——菜单、标志或文档——立即识别并转换成您选择的语言。"},
+/Users/khoiphan/projects/ragflow/agent/templates/image_lingo.json:51:"sys_prompt": "You are a multilingual translation assistant that works from images. When given a photo of any text or scene, you should:\n\n\n\n1. Detect and extract all written text in the image, regardless of font, orientation, or style.  \n\n2. Identify the source language of the extracted text.  \n\n3. Determine the target language:\n\n   - If the user explicitly specifies a language, use that.\n\n   - If no language is specified, automatically detect the user’s spoken language and use that as the target.  \n\n4. Translate the content accurately into the target language, preserving meaning, tone, and formatting (e.g., line breaks, punctuation).  \n\n5. If the image contains signage, menus, labels, or other contextual text, adapt the translation to be natural and context-appropriate for daily use.  \n\n6. Return the translated text in plain, well-formatted paragraphs. If the user asks, also provide transliteration for non-Latin scripts.  \n\n7. If the image is unclear or the target language cannot be determined, ask a clarifying follow-up question.\n\n\nExample:\n\nUser: “Translate this photo for me.”\n\nAgent Input: [Image of a Japanese train schedule]\n\nAgent Output:\n\n“7:30 AM – 東京駅 (Tokyo Station)  \n\n8:15 AM – 新大阪 (Shin-Osaka)”  \n\n(Detected user language: English)```\n\n",
+/Users/khoiphan/projects/ragflow/agent/templates/image_lingo.json:183:"sys_prompt": "You are a multilingual translation assistant that works from images. When given a photo of any text or scene, you should:\n\n\n\n1. Detect and extract all written text in the image, regardless of font, orientation, or style.  \n\n2. Identify the source language of the extracted text.  \n\n3. Determine the target language:\n\n   - If the user explicitly specifies a language, use that.\n\n   - If no language is specified, automatically detect the user’s spoken language and use that as the target.  \n\n4. Translate the content accurately into the target language, preserving meaning, tone, and formatting (e.g., line breaks, punctuation).  \n\n5. If the image contains signage, menus, labels, or other contextual text, adapt the translation to be natural and context-appropriate for daily use.  \n\n6. Return the translated text in plain, well-formatted paragraphs. If the user asks, also provide transliteration for non-Latin scripts.  \n\n7. If the image is unclear or the target language cannot be determined, ask a clarifying follow-up question.\n\n\nExample:\n\nUser: “Translate this photo for me.”\n\nAgent Input: [Image of a Japanese train schedule]\n\nAgent Output:\n\n“7:30 AM – 東京駅 (Tokyo Station)  \n\n8:15 AM – 新大阪 (Shin-Osaka)”  \n\n(Detected user language: English)```\n\n",
+/Users/khoiphan/projects/ragflow/agent/templates/customer_review_analysis.json:7:"zh": "客户评价分析"},
+/Users/khoiphan/projects/ragflow/agent/templates/customer_review_analysis.json:11:"zh": "大模型将自动分类客户评价，并通过电子邮件将结果发送到相关部门。"},
+/Users/khoiphan/projects/ragflow/agent/templates/deep_research.json:7:"zh": "深度研究"},
+/Users/khoiphan/projects/ragflow/agent/templates/deep_research.json:11:"zh": "专为销售、市场、政策或咨询领域的专业人士设计，多智能体的深度研究会结合多源信息进行结构化、多步骤地回答问题，并附带有清晰的引用。"},
+/Users/khoiphan/projects/ragflow/agent/templates/customer_service.json:7:"zh": "多智能体客服"},
+/Users/khoiphan/projects/ragflow/agent/templates/customer_service.json:11:"zh": "多智能体系统，用于智能客服场景。基于用户意图分类，使用主智能体识别用户需求类型，并将任务分配给子智能体进行处理。"},
+/Users/khoiphan/projects/ragflow/agent/templates/chunk_summary.json:6:"zh": "总结切片"
+/Users/khoiphan/projects/ragflow/agent/templates/chunk_summary.json:11:"zh": "此模板利用大模型生成切片摘要，并据此建立全文索引与向量。检索时以摘要提升匹配效果，最终召回对应的原文切片。"
+/Users/khoiphan/projects/ragflow/agent/templates/cv_analysis_and_candidate_evaluation.json:7:"zh": "简历分析和候选人评估"},
+/Users/khoiphan/projects/ragflow/agent/templates/cv_analysis_and_candidate_evaluation.json:11:"zh": "帮助公司评估简历的工作流。HR首先上传职位描述，通过聊天窗口提交多份简历进行评估。"},
+/Users/khoiphan/projects/ragflow/agent/templates/technical_docs_qa.json:7:"zh": "技术文档问答"},
+/Users/khoiphan/projects/ragflow/agent/templates/technical_docs_qa.json:11:"zh": "基于知识库的文档问答系统，当用户提出问题时，会检索相关本地文档并提供准确回答。"},
+/Users/khoiphan/projects/ragflow/agent/templates/trip_planner.json:7:"zh": "旅行规划"},
+/Users/khoiphan/projects/ragflow/agent/templates/trip_planner.json:11:"zh": "智能旅行规划将利用大模型自动生成定制化的旅行行程，附带可选工具集成，以增强可靠性。"},
+/Users/khoiphan/projects/ragflow/agent/templates/sql_assistant.json:6:"zh": "SQL助理"},
+/Users/khoiphan/projects/ragflow/agent/templates/sql_assistant.json:10:"zh": "用户能够将简单文本问题转化为完整的SQL查询并输出结果。只需输入您的问题（例如，展示上个季度前十名按收入排序的产品），SQL助理就会生成精确的SQL语句，对其运行您的数据库，并几秒钟内返回结果。"},
+/Users/khoiphan/projects/ragflow/agent/templates/title_chunker.json:6:"zh": "标题切片"
+/Users/khoiphan/projects/ragflow/agent/templates/title_chunker.json:11:"zh": "此模板将解析后的文件按标题结构进行切片，适用于具有清晰标题层级的文档类型，如产品手册、合同法规、研究报告和学术论文等。"
